@@ -1965,7 +1965,7 @@ function viewTiers(v){
           ${manual&&fin&&fin!==r.calc?`<span class="tiny" style="color:var(--warn)">计算 ${r.calc} 等，设为 ${fin} 等</span>`:""}
           ${r.noGrade?`<span class="tiny muted">未录成绩按 0 计</span>`:""}
         </div>
-        <div class="tiny muted" style="margin-top:3px">${r.grade||0}×${S.tierCfg.gw}% + ${r.p}×${S.tierCfg.pw}% − ${r.h}×${S.tierCfg.hw}% = 总分 ${r.total}</div>
+        <div class="tiny muted" style="margin-top:3px">${r.grade||0}×${S.tierCfg.gw}% + ${r.p}×${S.tierCfg.pw}% − ${r.h}×${S.tierCfg.hw}% = 总分 <b style="color:var(--${BC[fin]||'brand'});font-weight:800">${r.total}</b></div>
       </div>
       <span style="display:flex;gap:4px;flex:none">
         ${["A","B","C"].map(t=>`<button class="btn sm ${r.s.tier===t?"":"ghost"}" style="min-width:30px;padding:3px 0" onclick="W.setManual('${r.s.id}','${t}')">${t}</button>`).join("")}
