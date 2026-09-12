@@ -2,8 +2,17 @@
 <html lang="zh-CN" data-page-node-id="DLpMhKzAmEHxzrY7Hs9Czp">
 <head data-page-node-id="m5grhKPF7Q5BF0QoHjOnNV">
 <meta charset="UTF-8" data-page-node-id="zOvgGNbGcnfUHcn7m9xv7W">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="1VKUQTv2YvbAyHdNcvuAcO">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" data-page-node-id="1VKUQTv2YvbAyHdNcvuAcO">
 <title>班主任工作台</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="班主任工作台">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" href="icon.png">
+<meta name="format-detection" content="telephone=no,email=no,address=no">
+<meta name="theme-color" content="#f5f7fb">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14161d">
 <style>
 :root{
   --bg:#f5f7fb; --panel:#ffffff; --panel-2:#f0f3f9; --ink:#1f2533; --ink-2:#5b6478;
@@ -23,11 +32,14 @@ html[data-theme="dark"]{
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
   -webkit-font-smoothing:antialiased;
+  touch-action:manipulation;/* 关闭双击缩放：iOS 上双击会整页放大 */
 }
+a,button,input,select,textarea,label{touch-action:manipulation}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:14px}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -36,8 +48,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
 /* layout */
 .app{display:grid;grid-template-columns:var(--nav-w) 1fr;height:100vh;min-height:0}
 .side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-.brand{display:flex;align-items:center;gap:10px;padding:16px 16px 12px;font-weight:700;font-size:16px}
-.brand .logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
+/* 注意：侧边栏 Logo 用 .sb-brand，切勿写成 .brand——.brand 是 chip 的选中态变体（.chip.brand），同名会互相污染 */
+.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 16px 12px;font-weight:700;font-size:16px}
+.sb-brand .logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
 .nav{flex:1;overflow:auto;padding:6px 8px}
 .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;margin-bottom:2px}
 .nav a .ic{width:22px;text-align:center;font-size:16px;flex:none}
@@ -92,6 +105,9 @@ input.fld,select.fld,textarea.fld{
 input.fld:focus,select.fld:focus,textarea.fld:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .field{margin-bottom:13px}
 .field.row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+/* 两列表单行：子项允许收缩到内容以下（date/time/select 的固有宽度会撑破窄弹窗） */
+.field.row>div{min-width:0}
+input.fld[type=time],input.fld[type=date]{min-width:0}
 /* 行为类型下拉（选择框+输入框）：下拉列出全部已设类别，支持手输新类型 */
 .combobox{position:relative}
 .combobox .fld{padding-right:30px}
@@ -107,6 +123,11 @@ label.lbl{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px;fo
 .empty{padding:40px 20px;text-align:center;color:var(--ink-2)}
 .empty .big{font-size:34px;opacity:.5;margin-bottom:8px}
 .section-title{font-size:14px;font-weight:700;color:var(--ink);text-transform:none;margin:0 0 10px;letter-spacing:.01em}
+/* 可折叠卡片（<details class="card collapse">，默认收起）：summary 用 flex 右对齐操作键，自绘箭头替代默认三角 */
+details.collapse>summary{cursor:pointer;list-style:none;outline:none}
+details.collapse>summary::-webkit-details-marker{display:none}
+details.collapse>summary .chev{display:inline-block;margin-left:6px;font-size:11px;color:var(--ink-2);transition:transform .15s}
+details.collapse[open]>summary .chev{transform:rotate(90deg)}
 
 /* grid helpers */
 .grid{display:grid;gap:14px}
@@ -188,6 +209,8 @@ table.tbl tr:hover td{background:var(--panel-2)}
 table.tbl td .act{display:inline-flex;gap:6px}
 .plink{color:var(--brand-ink);text-decoration:none;border-bottom:1px dashed color-mix(in srgb,var(--brand) 55%,transparent);font-variant-numeric:tabular-nums;white-space:nowrap}
 .plink:hover{border-bottom-style:solid}
+/* 家长电话：号码前的 ☎ 小图标，提示可点击直接拨号 */
+.plink .ic{font-size:11px;margin-right:2px;opacity:.8;border-bottom:none}
 table.tbl th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
 table.tbl th.sortable:hover{color:var(--brand-ink)}
 table.tbl th.sortable.on{color:var(--brand-ink)}
@@ -350,12 +373,26 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .rd-mgr-item{border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:8px;background:var(--panel-2)}
 .rd-mgr-item .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .rd-mgr-item .row .fld{flex:1;min-width:0}
+/* 个人积分榜：可兑换积分（积分榜副行） */
+.pt-rdm{display:block;font-size:11px;font-weight:700;color:var(--brand-ink);margin-top:2px;font-variant-numeric:tabular-nums}
+/* 消除扣分：每条扣分记录行 */
+.el-pen{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px}
+.el-pen.done{opacity:.6}
+.el-pen .el-name{font-weight:700;font-size:13px}
 
 /* lottery */
 .lottery-stage{height:230px;border-radius:18px;background:rad(--panel-2);border:1px solid var(--line);display:grid;place-items:center;font-size:46px;font-weight:800;letter-spacing:.04em;color:var(--brand-ink);position:relative;overflow:hidden}
 .lottery-stage.roll{background:var(--brand-soft)}
 .lottery-stage .lbl{position:absolute;top:14px;left:18px;font-size:13px;font-weight:600;color:var(--ink-2);letter-spacing:.04em}
 .drawn-list .d{display:inline-flex;align-items:center;padding:5px 11px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);margin:4px;font-size:12.5px}
+/* 惩罚抽取：舞台比抽人矮，字号小（惩罚文字较长），允许换行 */
+.lottery-stage.pun{height:150px;font-size:30px;line-height:1.35;padding:30px 20px 0;text-align:center;word-break:break-word}
+.pun-log{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:6px}
+.pun-log .no{flex:none;min-width:20px;font-size:12px;font-weight:700;color:var(--ink-2);text-align:right}
+.pun-log .chk{flex:none;display:flex;align-items:center;cursor:pointer}
+.pun-log .chk input{width:16px;height:16px;margin:0;cursor:pointer;accent-color:var(--ok)}
+.pun-log.done{opacity:.6}
+.pun-log.done .txt{text-decoration:line-through}
 
 /* schedule */
 .sched-scroll{overflow-x:auto}
@@ -392,11 +429,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
 
 @media(max-width:1199px){
   .app{grid-template-columns:64px 1fr}
-  .brand .txt,.nav a .tx,.side-foot .tx{display:none}
-  .brand{justify-content:center;padding:16px 0 12px}
+  .sb-brand .txt,.nav a .tx,.side-foot .tx{display:none}
+  .sb-brand{justify-content:center;padding:16px 0 12px}
   .nav a{justify-content:center;padding:11px 0}
 }
 @media(max-width:767px){
+  /* iOS 防自动放大：输入框字号必须 ≥16px，否则 Safari 会在聚焦瞬间把整页放大 */
+  input,select,textarea,input.fld,select.fld,textarea.fld{font-size:16px}
   .app{grid-template-columns:1fr;height:auto;min-height:100vh;overflow-x:hidden}
   .side{display:none}
   .main{height:auto;padding-bottom:64px;min-width:0}
@@ -408,6 +447,9 @@ table.tbl.roster th.sortable{padding:9px 4px}
   /* 手机端底部导航：展示全部模块，横向可滑动；隐藏滚动条，切换页面时自动把当前项滚到可视区 */
   .bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);z-index:40;padding:6px 4px;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .bottom::-webkit-scrollbar{display:none}
+  /* 从主屏幕图标打开（无地址栏/全屏）时，避开 iPhone 底部横条 */
+  .bottom{padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+  .main{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   .bottom a{flex:0 0 auto;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:var(--ink-2);font-size:11px;font-weight:600;padding:4px 2px;white-space:nowrap}
   .bottom a .ic{font-size:18px}
   .bottom a.active{color:var(--brand-ink)}
@@ -452,7 +494,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 <body data-page-node-id="WKyavnS7yVYO8qWNuXAl2D">
 <div class="app" data-page-node-id="SyJJyEMFuY4eCpHcFTtjuE">
   <aside class="side" data-page-node-id="PKFN83eXqKw5YvAywsrG5L">
-    <div class="brand" data-page-node-id="b52hrlZ3CCfXEtxk5h9nPQ"><span class="logo" data-page-node-id="9Hva0nqSnIl6Skvt8L9398">班</span><span class="txt" data-page-node-id="AB7dGSCnJm8HdMFJanuzVO">班主任工作台</span></div>
+    <div class="sb-brand" data-page-node-id="b52hrlZ3CCfXEtxk5h9nPQ"><span class="logo" data-page-node-id="9Hva0nqSnIl6Skvt8L9398">班</span><span class="txt" data-page-node-id="AB7dGSCnJm8HdMFJanuzVO">班主任工作台</span></div>
     <nav class="nav" id="nav" data-page-node-id="AdBHiutZ96DQlHZduH4Iri"></nav>
     <div class="side-foot" data-page-node-id="ZEFg3CG7F80LzeA8JY4Ril">
       <button class="icon-btn" id="themeBtn" title="切换主题" data-page-node-id="Y5eDwP7OZCg9hqZZ2XNzAa">🌙</button>
@@ -466,7 +508,6 @@ table.tbl.roster th.sortable{padding:9px 4px}
         <div class="sub" id="pageSub" data-page-node-id="9vdoAa89dDf2saqg3XbCAA"></div>
       </div>
       <div class="spacer" data-page-node-id="pffhfXnk5bXJkJDu2djCc4"></div>
-      <button class="btn ghost sm" id="dataBtn" data-page-node-id="uNSgiKGV3qRFRV1gwjqYhe">数据</button>
     </div>
     <div class="view" data-page-node-id="N4czWFKUFmSgggFWSmzWbf"><div class="wrap" id="view" data-page-node-id="zkZmzLWHnk4FXhej2jCrZB"></div></div>
   </div>
@@ -486,8 +527,19 @@ const DEFAULT_SUBJECTS=["语文","数学","英语","物理","化学","生物"];
 const DEFAULT_BEH_TYPES=()=>[
   {k:"违纪",c:"bad",pts:-1},{k:"作业优秀",c:"ok",pts:1},{k:"作业未交",c:"bad",pts:-2},
   {k:"作业差",c:"warn",pts:-1},{k:"表扬",c:"ok",pts:1},{k:"答题",c:"brand",pts:1},
-  {k:"请假",c:"warn",pts:0},{k:"其他",c:"brand",pts:0}
+  {k:"请假",c:"warn",pts:0},{k:"其他",c:"brand",pts:0},{k:"成绩",c:"brand",pts:0}
 ];
+/* ---- 成绩规则：导入成绩后按「单科名次 + 单科退步」自动录入「成绩」类别记录 ----
+   分值可在「行为类别」弹窗里改；同一场考试重复导入会覆盖上次的自动记录，不会重复计分。 */
+const GRADE_TYPE="成绩";
+const GRADE_RULE_LABELS=[
+  ["top10","单科前十（第 1–10 名）"],
+  ["top20","单科 11–20 名"],
+  ["bot10","单科后十（倒数 1–10 名）"],
+  ["bot20","单科后 11–20 名"],
+  ["drop","单科退步 ≥ 5 分（与上一场比）"]
+];
+const DEFAULT_GRADE_RULES=()=>({top10:2,top20:1,bot10:-2,bot20:-1,drop:-1});
 function btype(k){const arr=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());const t=arr.find(x=>x.k===k);return t||{k,c:"brand",pts:0};}
 /* 积分兑换：分类 cats / 奖励项目 items / 兑换记录 logs。stock 为 null 表示不限量 */
 const DEFAULT_REDEEM=()=>({
@@ -501,12 +553,23 @@ const DEFAULT_REDEEM=()=>({
   ],
   logs:[]
 });
+/* 惩罚抽取默认惩罚项（可自定义增删改） */
+const DEFAULT_PUNS=()=>[
+  {id:"pn1",name:"罚站 5 分钟"},
+  {id:"pn2",name:"罚抄课文 1 遍"},
+  {id:"pn3",name:"做 10 个深蹲"},
+  {id:"pn4",name:"唱一首歌"},
+  {id:"pn5",name:"值日一天"}
+];
 function behColor(c){return c==='bad'?'var(--bad)':c==='ok'?'var(--ok)':c==='warn'?'var(--warn)':'var(--brand)';}
 const uid=()=>Math.random().toString(36).slice(2,9);
 function def(){
   return {students:[],exams:[],todos:[],behaviors:[],seatCfg:{rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],row0Merge:{},tagSide:"left",leaders:{}},seating:null,seatZones:null,seatFixed:null,
     behTypes:DEFAULT_BEH_TYPES(),
-    points:{scores:{},logs:[]},groups:[],lottery:{drawn:[],allowRepeat:false},
+    gradeRules:DEFAULT_GRADE_RULES(),
+    points:{scores:{},logs:[]},groups:[],
+    /* 抽签：drawn = 本轮已抽学生；puns = 自定义惩罚项；punLogs = 惩罚抽取记录（只抽惩罚，不关涉学生） */
+    lottery:{drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]},
     redeem:DEFAULT_REDEEM(),
     /* 课表：cells 键 "周几-节次"（节次为数字 1..12；早自习=m，晚自习=e）
        times[p]={s,e} 每节次上课时间（含 m / e 早、晚自习）；早/晚自习行「有课时」才显示，位置在首/尾 */
@@ -536,9 +599,12 @@ function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d){const ba
   if(Array.isArray(d.work)&&!d._migrated){(d.work).forEach(w=>{base.todos.push({id:w.id||uid(),text:w.text||"",done:!!w.done,type:"事件",date:w.date||"",cat:w.cat||"",list:"以后",priority:"",due:""});});base._migrated=true;}
   delete base.work;
   /* 抽签：旧数据无 allowRepeat 字段 → 保持原有「不重复」行为 */
-  if(!base.lottery||typeof base.lottery!=="object")base.lottery={drawn:[],allowRepeat:false};
+  if(!base.lottery||typeof base.lottery!=="object")base.lottery={drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]};
   if(!Array.isArray(base.lottery.drawn))base.lottery.drawn=[];
   if(base.lottery.allowRepeat===undefined)base.lottery.allowRepeat=false;
+  /* 惩罚抽取：旧数据补上自定义惩罚列表与记录 */
+  if(!Array.isArray(base.lottery.puns))base.lottery.puns=DEFAULT_PUNS();
+  if(!Array.isArray(base.lottery.punLogs))base.lottery.punLogs=[];
   /* 旧版单值 bigGroup(等分) → bigGroups(数组，按列均分首版) */
   if(base.seatCfg&&base.seatCfg.bigGroup!==undefined&&!Array.isArray(base.seatCfg.bigGroups)){
     const bg=Math.max(1,Math.min(base.seatCfg.cols,base.seatCfg.bigGroup|0||3));
@@ -694,22 +760,25 @@ function clearAllAsk(){
 /* ============ nav ============ */
 const NAV=[
   {r:"home",t:"首页",ic:"🏠"},
-  {r:"roster",t:"学生名册",ic:"👥"},
   {r:"schedule",t:"课表",ic:"📅"},
+  {r:"roster",t:"学生名册",ic:"👥"},
   {r:"seating",t:"排位",ic:"🪑"},
   {r:"todos",t:"事务安排",ic:"✅"},
   {r:"behavior",t:"行为记录",ic:"📝"},
+  {r:"behtypes",t:"行为类别",ic:"🏷️",hide:true},
   {r:"grades",t:"成绩管理",ic:"📊"},
-  {r:"jobs",t:"班级工作",ic:"🧹"},
-  {r:"tiers",t:"学生等级",ic:"🏅"},
   {r:"points",t:"积分",ic:"⭐"},
-  {r:"lottery",t:"抽签",ic:"🎲"}
+  {r:"lottery",t:"抽签",ic:"🎲"},
+  {r:"tiers",t:"学生等级",ic:"🏅"},
+  {r:"jobs",t:"班级工作",ic:"🧹"},
+  {r:"data",t:"数据",ic:"🗄️"}
 ];
 function buildNav(){
-  document.getElementById("nav").innerHTML=NAV.map(n=>
+  const vis=NAV.filter(n=>!n.hide);
+  document.getElementById("nav").innerHTML=vis.map(n=>
     `<a href="#${n.r}" data-r="${n.r}"><span class="ic">${n.ic}</span><span class="tx">${n.t}</span></a>`).join("");
   /* 手机端底部导航：直接铺全部模块（顺序与左侧一致），容器横向可滑动 */
-  document.getElementById("bottom").innerHTML=NAV.map(n=>
+  document.getElementById("bottom").innerHTML=vis.map(n=>
     `<a href="#${n.r}" data-r="${n.r}"><span class="ic">${n.ic}</span><span>${n.t}</span></a>`).join("");
   const sheet=document.getElementById("moreSheet");if(sheet)sheet.innerHTML="";
 }
@@ -770,7 +839,7 @@ function refresh(){route();}
 const routes={
   home:viewHome, roster:viewRoster, grades:viewGrades, todos:viewTasks, behavior:viewBehavior,
   seating:viewSeating, tiers:viewTiers, points:viewPoints, lottery:viewLottery, schedule:viewSchedule,
-  jobs:viewJobs
+  jobs:viewJobs, behtypes:viewBehTypes, data:viewData
 };
 function route(){
   const h=(location.hash||"#home").replace("#","");
@@ -794,9 +863,11 @@ const SUB={
   home:"今日待办、快捷操作与最近动态", roster:"班级学生花名册，支持导入与搜索",
   grades:"按考试录入成绩并自动排名", todos:"班级日常事务与固定日期的工作安排，合并管理", behavior:"表扬、违纪、请假等记录",
   seating:"教室座位排布与轮换", tiers:"成绩+积分−身高 加权计算 A/B/C 等级",
-  points:"个人与小组积分榜", lottery:"随机抽人，可切换是否允许重复",
+  points:"个人与小组积分榜", lottery:"随机抽人 + 自定义惩罚抽取",
   schedule:"本周课程表",
-  jobs:"科任老师 + 班级管理职务 + 历史任职"
+  jobs:"科任老师 + 班级管理职务 + 历史任职",
+  behtypes:"表扬、违纪等类别与默认分值，可导入导出复用",
+  data:"数据保存在本机浏览器，可开启云端同步多设备共用"
 };
 
 /* ============ HOME ============ */
@@ -920,7 +991,6 @@ function viewRoster(v){
       <table class="tbl roster"><thead><tr>${ROSTER_COLS.map(c=>c.k?sortTh(c.k,c.t,c.c):`<th class="${c.c}">${c.t}</th>`).join("")}</tr></thead>
       <tbody>${rosterRows()}</tbody></table>
     </div>
-    <div class="tiny muted" style="margin-top:10px">点击表头可排序（升序 → 降序）；CSV 格式：${ROSTER_LABELS.slice(0,8).join(",")} —— 首行为表头时按列名匹配</div>
   </div>`;
 }
 /* 家长电话：点击直接拨号（手机端 tel: 唤起拨号，桌面端可交给已关联的拨号应用） */
@@ -932,7 +1002,7 @@ function phoneList(p){
 function phoneLink(p){
   const arr=phoneList(p);
   if(!arr.length)return "—";
-  return arr.map(t=>`<a class="plink" href="${esc(phoneHref(t))}" title="点击拨打 ${esc(t)}">${esc(t)}</a>`).join("<br>");
+  return arr.map(t=>`<a class="plink" href="${esc(phoneHref(t))}" title="点击拨打 ${esc(t)}"><span class="ic">☎</span>${esc(t)}</a>`).join("<br>");
 }
 function rosterList(){
   let list=S.students.slice();
@@ -971,7 +1041,7 @@ let gradeExam=null;
 /* ============ GRADES ============ */
 let gradeEdit=false;
 function viewGrades(v){
-  if(!S.exams.length){v.innerHTML=`<div class="card pad" style="text-align:center"><div class="empty"><div class="big">📊</div>还没有考试，先添加一场</div><button class="btn" onclick="W.newExam()" style="margin-top:10px">+ 添加考试</button></div>`;return;}
+  if(!S.exams.length){v.innerHTML=`<div class="card pad" style="text-align:center"><div class="empty"><div class="big">📊</div>还没有考试，先添加一场</div><button class="btn" onclick="W.newExam()" style="margin-top:10px">添加</button></div>`;return;}
   if(!gradeExam||!el(gradeExam,S.exams))gradeExam=S.exams[0].id;
   const ex=el(gradeExam,S.exams);
   const ranks=gradeRanks(ex);
@@ -979,14 +1049,14 @@ function viewGrades(v){
   const subjRanks={};ex.subjects.forEach(sub=>subjRanks[sub]=subjRankMap(ex,sub));
   v.innerHTML=`
   <div class="between row wrap" style="margin-bottom:12px">
-    <div class="row">
-      <select class="fld" style="width:auto" onchange="gradeExam=this.value;viewGrades(document.getElementById('view'))">${S.exams.map(e=>`<option value="${e.id}" ${e.id===gradeExam?"selected":""}>${esc(e.name)}</option>`).join("")}</select>
+    <div class="row" style="gap:8px">
+      <select class="fld h30" style="width:auto" onchange="gradeExam=this.value;viewGrades(document.getElementById('view'))">${S.exams.map(e=>`<option value="${e.id}" ${e.id===gradeExam?"selected":""}>${esc(e.name)}</option>`).join("")}</select>
       <span class="chip">${esc(ex.date||"")}</span>
     </div>
-    <div class="row">
-      <button class="btn ghost sm" onclick="W.importGrades('${ex.id}')">导入</button>
-      <button class="btn ghost sm" onclick="W.exportGrades('${ex.id}')">导出</button>
-      <button class="btn sm" onclick="W.newExam()">+ 添加考试</button>
+    <div class="row" style="gap:6px">
+      <button class="btn ghost sm h30" onclick="W.importGrades('${ex.id}')">导入</button>
+      <button class="btn ghost sm h30" onclick="W.exportGrades('${ex.id}')">导出</button>
+      <button class="btn sm h30" onclick="W.newExam()">添加</button>
     </div>
   </div>
   <div class="card pad">
@@ -1036,6 +1106,102 @@ function deltaCell(cur,old){
   if(!d)return `<td class="mini g-delta"><span class="muted">0</span></td>`;
   return `<td class="mini g-delta"><b style="color:${d>0?"var(--ok)":"var(--bad)"}">${d>0?"+"+d:d}</b></td>`;
 }
+/* ---- 成绩规则：读取 / 兜底 ---- */
+function gradeRules(){
+  const d=DEFAULT_GRADE_RULES();
+  if(!S.gradeRules||typeof S.gradeRules!=="object")S.gradeRules=d;
+  GRADE_RULE_LABELS.forEach(([k])=>{
+    const v=parseInt(S.gradeRules[k],10);
+    S.gradeRules[k]=isFinite(v)?Math.max(-99,Math.min(99,v)):d[k];
+  });
+  return S.gradeRules;
+}
+/* 保证「成绩」类别存在（老数据没有，按需补上） */
+function ensureGradeType(){
+  const arr=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
+  if(!arr.some(t=>t.k===GRADE_TYPE))arr.push({k:GRADE_TYPE,c:"brand",pts:0});
+  return arr;
+}
+/* 名次分档（四档互斥，其余名次不加不减）。rr = 倒数名次 = 有成绩人数 − 正名次 + 1 */
+function gradeRankBucket(r,m){
+  const rr=m-r+1;
+  if(r<=10)return "top10";
+  if(r<=20)return "top20";
+  if(rr<=10)return "bot10";
+  if(rr<=20)return "bot20";
+  return "";
+}
+/* 按规则为该考试生成自动记录。幂等：先撤销这场考试上次生成的自动记录（含积分与日志），再重建。
+   返回值 = 生成的记录条数。每人每科生成 1 条记录，事由里写清 具体考试 + 具体科目 + 名次/退步明细。 */
+function applyGradeRules(ex){
+  ensureGradeType();
+  const R=gradeRules();
+  /* 1) 撤销旧记录：先扣回积分，再删行为与积分日志 */
+  S.behaviors.filter(b=>b.auto===GRADE_TYPE&&b.examId===ex.id).forEach(b=>{
+    const d=b.delta||0;
+    if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
+  });
+  S.behaviors=S.behaviors.filter(b=>!(b.auto===GRADE_TYPE&&b.examId===ex.id));
+  S.points.logs=S.points.logs.filter(l=>!(l.auto===GRADE_TYPE&&l.examId===ex.id));
+  /* 2) 逐科算名次档位与退步，按 学生×科目 聚合 */
+  const prev=prevExam(ex);
+  const det={};/* sid -> sub -> {rk,bk,drop} */
+  const add=(sid,sub,rk,bk,dropAmt)=>{
+    if(!det[sid])det[sid]={};
+    const o=det[sid][sub]||(det[sid][sub]={});
+    if(rk!==undefined)o.rk=rk;
+    if(bk)o.bk=bk;
+    if(dropAmt!==undefined)o.drop=dropAmt;
+  };
+  ex.subjects.forEach(sub=>{
+    const rm=subjRankMap(ex,sub);
+    const ids=Object.keys(rm),m=ids.length;
+    if(!m)return;
+    ids.forEach(id=>{
+      const rk=rm[id];
+      const bk=gradeRankBucket(rk,m);
+      if(bk)add(id,sub,rk,bk);
+      if(prev){
+        const cu=+((ex.scores[id]||{})[sub]);
+        const ol=+((prev.scores[id]||{})[sub]);
+        if(isFinite(cu)&&isFinite(ol)&&(ol-cu)>=5)add(id,sub,undefined,undefined,(ol-cu));
+      }
+    });
+  });
+  /* 3) 生成记录：每人每科一条，事由 = 具体考试 + 具体科目 + 名次/退步明细（分值全 0 不生成） */
+  const time=nowStr();
+  let n=0;
+  Object.keys(det).forEach(id=>{
+    Object.keys(det[id]).forEach(sub=>{
+      const o=det[id][sub];
+      let reason="",sum=0;
+      if(o.bk&&R[o.bk]){
+        const pts=R[o.bk];
+        reason+=sub+"第"+o.rk+" "+(pts>0?"+":"")+pts;
+        sum+=pts;
+      }
+      if(o.drop&&R.drop){
+        const pts=R.drop;
+        reason+=(reason?"；":"")+sub+"退步"+o.drop+"分 "+(pts>0?"+":"")+pts;
+        sum+=pts;
+      }
+      if(!sum)return;
+      const full=ex.name+" "+reason;
+      const b={id:uid(),studentId:id,type:GRADE_TYPE,reason:full,time,delta:sum,auto:GRADE_TYPE,examId:ex.id};
+      S.behaviors.push(b);
+      S.points.scores[id]=(S.points.scores[id]||0)+sum;
+      S.points.logs.push({id:uid(),studentId:id,delta:sum,reason:"行为·"+GRADE_TYPE+"："+full,time,behId:b.id,auto:GRADE_TYPE,examId:ex.id});
+      n++;
+    });
+  });
+  return n;
+}
+W.setGradeRule=(k,val)=>{
+  if(!GRADE_RULE_LABELS.some(([kk])=>kk===k))return;
+  const R=gradeRules();
+  R[k]=Math.max(-99,Math.min(99,parseInt(val,10)||0));
+  save();W.renderBehTypes();
+};
 
 /* ============ TODOS ============ */
 let todoFold={};/* 已完成/已放弃 按月折叠：{月份key:true} = 已展开（默认收起） */
@@ -1090,11 +1256,11 @@ function viewTasks(v){
     </div>
     <div class="row wrap" style="gap:8px">
       <select class="fld h30" id="taskTypeSel" style="width:auto" onchange="W.refreshTaskForm()"><option value="日常">日常</option><option value="事件">事件</option></select>
+      <select class="fld h30" id="taskPri" style="width:24%" title="优先级（仅日常）"><option value="">优先级</option><option value="高">高</option><option value="中">中</option><option value="低">低</option></select>
       <input class="fld h30" type="date" id="taskDate" style="width:auto" title="事件日期 / 日常截止日；设了重复周期时，这里作为「重复至」截止日">
-      <select class="fld h30" id="taskPri" style="width:auto" title="优先级（仅日常）"><option value="">优先级</option><option value="高">高</option><option value="中">中</option><option value="低">低</option></select>
       ${repBoxHtml(0,"天")}
       <select class="fld h30" id="taskCat" style="width:auto" title="位置（仅事件）"><option value="学校">学校</option><option value="班级">班级</option></select>
-      <button class="btn h30" onclick="W.addTask()">添加</button>
+      <button class="btn h30" style="margin-left:auto" onclick="W.addTask()">添加</button>
     </div>
   </div>
   ${items.length?`<div class="task-list">${items.map(taskLine).join("")}</div>`:emptyHtml}
@@ -1134,10 +1300,10 @@ function viewBehavior(v){
   v.innerHTML=`
   <div class="card pad">
     <div class="row wrap" style="gap:8px;margin-bottom:12px">
-      <input class="fld h36" style="flex:1;min-width:0" placeholder="搜索学生 / 事由…" value="${esc(behKw)}" oninput="behKw=this.value;viewBehavior(document.getElementById('view'))">
+      <input class="fld h30" style="flex:1;min-width:0" placeholder="搜索学生 / 事由…" value="${esc(behKw)}" oninput="behKw=this.value;viewBehavior(document.getElementById('view'))">
       ${behRangeSel}${behCustomBox}
-      <button class="btn ghost sm h30" style="width:72px;flex:none" onclick="W.manageBehTypes()">类别</button>
-      <button class="btn sm h30" style="flex:none" onclick="W.addBehavior()">+ 快速记录</button>
+      <button class="btn ghost sm h30" style="width:44px;flex:none" onclick="location.hash='#behtypes'">类别</button>
+      <button class="btn sm h30" style="width:44px;flex:none" onclick="W.addBehavior()">记录</button>
     </div>
     <div class="tiny muted" style="margin:-6px 0 10px">时间范围：${esc(ptRangeLabel(bv))} · ${list.length} 条</div>
     <div class="row wrap" style="margin-bottom:12px">${filters}</div>
@@ -1411,11 +1577,10 @@ function viewSeating(v){
     </div>
   </div>`:""}
   ${tierOpen?`<div class="card pad" style="margin-bottom:12px">
-    <div class="between row wrap" style="margin-bottom:8px">
+    <div class="between row wrap" style="margin-bottom:6px">
       <div class="row" style="gap:6px">
         <span class="section-title" style="margin:0">等级排位</span>
         ${brush("A","A")}${brush("B","B")}${brush("C","C")}${brush("F","定")}<button class="brush" title="一键清除所有 A/B/C 等级区域；已固定的座位不受影响" onclick="W.clearTierZones()">清</button>
-        <span class="tiny ${zoneBrush?"":"muted"}" style="${zoneBrush?"color:var(--brand-ink)":""}">${hint}</span>
       </div>
       <div class="row" style="gap:6px">
         <button class="btn ghost sm h30" onclick="W.editTiers()">学生等级</button>
@@ -1424,12 +1589,13 @@ function viewSeating(v){
         <button class="btn sm h30" onclick="W.runTierSeat()" title="按 A/B/C 区域安排对应等级的学生就座">按等级排</button>
       </div>
     </div>
+    <div class="tiny ${zoneBrush?"":"muted"}" style="margin-bottom:8px;${zoneBrush?"color:var(--brand-ink)":""}">${hint}</div>
     <div class="row" style="gap:6px">${tierLine}${S.seatFixed.filter(Boolean).length?`<span class="tiny muted"> · 固定 ${S.seatFixed.filter(Boolean).length} 座</span>`:""}</div>
   </div>`:""}
   ${mergeMode?`<div class="tiny muted" style="margin-bottom:8px;padding:6px 10px;background:var(--brand-soft);border:1px dashed var(--brand);border-radius:8px;color:var(--brand-ink)">合模式：点学习组名选中（可多选、可跨大组${cfg.row0?"；点第0排标签切换归入":""}）→ 再点「合」执行合并；空选时点「合」退出${mergeSel.size?` · 已选 ${mergeSel.size} 个`:''}</div>`:""}
   <div class="card pad">
     <div class="row wrap" style="gap:8px;align-items:center;margin-bottom:10px">
-      <span class="section-title" style="margin:0">教室座位（拖拽学生或组名可换座，组名拖拽为整组对调）</span>
+      <span class="section-title" style="margin:0">教室座位（拖拽学生或组名可换座）</span>
       <button class="btn ghost sm h30" onclick="W.editLeaders()" title="设置每个学习组的大组长与小组长（仅标记身份，不影响积分）">组长</button>
     </div>
     <div class="seat-scroll" style="grid-template-columns:${gridTpl}">
@@ -1455,12 +1621,11 @@ function viewTiers(v){
   const subjSet=[];S.exams.forEach(e=>e.subjects.forEach(s=>{if(!subjSet.includes(s))subjSet.push(s);}));
   Object.keys(DEFAULT_SUBJ_W).forEach(s=>{if(!subjSet.includes(s))subjSet.push(s);});
   v.innerHTML=`
-  <div class="card pad" style="margin-bottom:12px">
-    <div class="between row wrap" style="margin-bottom:8px">
-      <span class="section-title" style="margin:0">权重设置</span>
-      <button class="btn ghost sm" onclick="W.manualTiers()">手动设定</button>
-    </div>
-    <div class="row wrap" style="gap:8px;margin-bottom:8px">
+  <details class="card pad collapse" style="margin-bottom:12px">
+    <summary>
+      <span class="section-title" style="margin:0">权重设置<span class="chev">▸</span></span>
+    </summary>
+    <div class="row wrap" style="gap:8px;margin:10px 0 8px">
       <label class="tiny muted">成绩 %<input class="fld h30" style="width:56px;margin-left:4px" type="number" min="0" max="100" value="${S.tierCfg.gw}" onchange="W.setTierCfg('gw',this.value)"></label>
       <label class="tiny muted">积分 %<input class="fld h30" style="width:56px;margin-left:4px" type="number" min="0" max="100" value="${S.tierCfg.pw}" onchange="W.setTierCfg('pw',this.value)"></label>
       <label class="tiny muted">身高 %<input class="fld h30" style="width:56px;margin-left:4px" type="number" min="0" max="100" value="${S.tierCfg.hw}" onchange="W.setTierCfg('hw',this.value)"></label>
@@ -1470,9 +1635,12 @@ function viewTiers(v){
       ${subjSet.map(s=>`<label class="tiny muted">${esc(s)} %<input class="fld h30" style="width:52px;margin-left:4px" type="number" min="0" max="100" value="${subjW(s)}" onchange="W.setSubjW('${esc(s)}',this.value)"></label>`).join("")}
     </div>
     <div class="tiny muted" style="margin-top:8px">总分 = 成绩 ${S.tierCfg.gw}% + 积分 ${S.tierCfg.pw}% − 身高 ${S.tierCfg.hw}%（身高为减项，越矮总分越高）· 成绩：${selExams.length?selExams.map(e=>esc(e.name)).join("、")||"全部考试":"全部考试"} · 积分：${S.tierCfg.pointRange==="all"?"全部累计":"最近 "+S.tierCfg.pointRange+" 天"}</div>
-  </div>
+  </details>
   <div class="card pad">
-    <div class="section-title">等级计算（前 1/3 A · 中 1/3 B · 后 1/3 C）</div>
+    <div class="between row wrap" style="margin-bottom:10px">
+      <span class="section-title" style="margin:0">等级计算（前·中·后 1/3= A·B·C）</span>
+      <button class="btn ghost sm" onclick="W.manualTiers()">手动设定</button>
+    </div>
     ${rows.length?rows.map(r=>{
       const fin=tierOf(r.s);const manual=!!r.s.tier;
       return `<div class="r-item"><span class="pt-rank ${r.rank<=3?"top":""}">${r.rank}</span>
@@ -1597,7 +1765,7 @@ W.showPersonLogs=id=>{
   const ls=logsOfIds([id]).slice().reverse();
   const sum=ls.reduce((a,l)=>a+(+l.delta||0),0);
   openModal(`<h3>${esc(s.name)} 的积分明细</h3>
-  <div class="tiny muted" style="margin:2px 0 6px">${esc(s.g?s.g+" · ":"")}${esc(s.no||"")}号 · ${esc(ptDetailAll?"全部记录":ptRangeLabel())} · ${ls.length} 条 · 合计 <b style="color:${sum<0?'var(--bad)':'var(--ok)'}">${sum}</b></div>
+  <div class="tiny muted" style="margin:2px 0 6px">${esc(s.g?s.g+" · ":"")}${esc(s.no||"")}号 · ${esc(ptDetailAll?"全部记录":ptRangeLabel())} · ${ls.length} 条 · 积分 <b style="color:${sum<0?'var(--bad)':'var(--ok)'}">${sum}</b> · 可兑换 <b style="color:var(--brand-ink)">${rdmBalance(id)}</b></div>
   ${detailHead()}
   <div style="max-height:48vh;overflow:auto;margin-top:4px">${logListHtml(ls,false)}</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
@@ -1652,9 +1820,10 @@ function viewPoints(v){
       <div class="between row" style="margin-bottom:10px"><span class="section-title" style="margin:0">个人积分榜<span class="tiny muted" style="font-weight:400;margin-left:6px">点姓名看明细</span></span></div>
       ${person.map((p,i)=>`<div class="pt-row"><span class="pt-rank ${i<3?'top':''}">${i+1}</span>
         <span class="pt-name pt-link" onclick="W.showPersonLogs('${p.s.id}')" title="查看 ${esc(p.s.name)} 的积分记录">${esc(p.s.name)} <span class="tiny muted">${esc(p.s.g)}组 · ${esc(p.s.no)}号</span></span>
-        <span class="pt-score" style="color:${p.score<0?'var(--bad)':'var(--ok)'}">${p.score}</span>
+        <span class="pt-score" style="color:${p.score<0?'var(--bad)':'var(--ok)'}">${p.score}
+          <small class="pt-rdm" title="可兑换积分（用于积分兑换，不改动上方积分）">兑 ${rdmBalance(p.s.id)}</small></span>
         <span class="pt-btns">
-          <button class="btn ghost sm h24" onclick="W.addBehavior('${p.s.id}')" title="用「快速记录」弹窗记录（含类型/分值/时间，可登记新类型）">记录</button>
+          <button class="btn ghost sm h24" onclick="W.addBehavior('${p.s.id}')" title="用「记录」弹窗记录（含类型/分值/时间，可登记新类型）">记录</button>
         </span></div>`).join("")||`<div class="empty">暂无学生</div>`}
     </div>
   `:ptTab==='group'?`
@@ -1692,8 +1861,25 @@ function ensureRedeem(){
 function rdmStock(it){const s=it&&it.stock;return (s===null||s===undefined||s==="")?null:+s;}
 function rdmCatName(catId){const c=el(catId,ensureRedeem().cats);return c?c.name:"未分类";}
 function rdmItem(id){return el(id,ensureRedeem().items);}
-/* 可兑换余额 = 累计总积分（不受积分页统计范围影响） */
-function rdmBalance(sid){return +(S.points.scores&&S.points.scores[sid]||0);}
+/* 可兑换积分 = 累计积分（S.points.scores，含奖惩，永久不变）
+                − 奖励兑换已消耗（cost*qty，只减「可兑换积分」，不改「积分」）
+                + 消除扣分已恢复（qty*cost，清除待消除扣分、抬升「可兑换积分」，不改「积分」） */
+function rdmRewardSpent(sid){
+  const R=ensureRedeem();
+  return (R.logs||[]).reduce((a,l)=>{
+    if(l.studentId!==sid||l.type==='eliminate')return a;
+    return a+(+l.cost||0)*(+l.qty||1);
+  },0);
+}
+function rdmForgiven(sid){
+  const R=ensureRedeem();
+  return (R.logs||[]).reduce((a,l)=>{
+    if(l.studentId!==sid||l.type!=='eliminate')return a;
+    const c=(+l.qty||0)?(+l.cost||0)*(+l.qty||1):(+l.cost||0);
+    return a+c;
+  },0);
+}
+function rdmBalance(sid){return (+(S.points.scores&&S.points.scores[sid]||0)) - rdmRewardSpent(sid) + rdmForgiven(sid);}
 /* 按分类分组；筛选为 all 时列出全部分类 + 「未分类」兜底 */
 function redeemGroups(){
   const R=ensureRedeem();
@@ -1727,19 +1913,28 @@ function redeemSectionHtml(){
           <button class="btn ghost sm h24" ${out?"disabled":""} onclick="W.redeemItem('${it.id}')" title="用积分兑换">兑换</button>
         </div></div>`;}).join("")}</div>`:`<div class="tiny muted">该分类下暂无项目</div>`}
   `).join("")||(R.items.length?"":`<div class="empty">还没有兑换项目，点「管理」添加分类与奖励</div>`);
-  const logs=(R.logs||[]).slice().reverse().slice(0,15);
-  const logHtml=logs.length?logs.map(l=>`<div class="r-item"><span class="r-dot" style="background:var(--warn);color:var(--warn)"></span>
-      <div style="flex:1"><div>${esc(studentName(l.studentId))} 兑换 <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""} <b>−${(+l.cost||0)*(+l.qty||1)}</b> 分${l.catName?` <span class="tiny muted">· ${esc(l.catName)}</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div></div>`).join(""):`<div class="empty">还没有兑换记录</div>`;
+  const all=(R.logs||[]).slice().sort((a,b)=>(b.time||"").localeCompare(a.time||"")).slice(0,15);
+  const logHtml=all.length?all.map(l=>{
+    if(l.type==='eliminate'){
+      const n=(+l.eliminated||(+l.cost||0)*(+l.qty||1)), m=n;
+      const it=l.itemName?` <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""}`:"";
+      return `<div class="r-item"><span class="r-dot" style="background:var(--bad);color:var(--bad)"></span>
+        <div style="flex:1"><div>${esc(studentName(l.studentId))} 消除扣分${it} <b>${n}</b> 分<span class="tiny muted">（恢复 ${m} 可兑换积分，不改动原积分）</span></div><div class="tiny muted">${esc(l.time)}</div></div></div>`;
+    }
+    const c=(+l.cost||0)*(+l.qty||1);
+    return `<div class="r-item"><span class="r-dot" style="background:var(--warn);color:var(--warn)"></span>
+      <div style="flex:1"><div>${esc(studentName(l.studentId))} 兑换 <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""} <b>−${c}</b> 分${l.catName?` <span class="tiny muted">· ${esc(l.catName)}</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div></div>`;
+  }).join(""):`<div class="empty">还没有兑换记录</div>`;
   return `
   <div class="card pad">
-    <div class="between row wrap" style="margin-bottom:10px">
-      <span class="section-title" style="margin:0">积分兑换<span class="tiny muted" style="font-weight:400;margin-left:6px">用累计积分兑换奖励</span></span>
-      <span class="row wrap" style="gap:6px;margin-left:auto">${filterSel}<button class="btn ghost sm h30" onclick="W.manageRedeem()">管理</button></span>
+    <div class="between row" style="margin-bottom:10px">
+      <span class="section-title" style="margin:0">积分兑换</span>
+      <span class="row" style="gap:6px">${filterSel}<button class="btn ghost sm h30" onclick="W.eliminateStart()" title="用可兑换积分消除已扣的分（不改动原积分）">消除扣分</button><button class="btn ghost sm h30" onclick="W.manageRedeem()">管理</button></span>
     </div>
     ${body}
   </div>
   <div class="card pad" style="margin-top:14px">
-    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">兑换记录</span>${logs.length?`<span class="tiny muted">最近 ${logs.length} 条</span>`:""}</div>
+    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">兑换记录</span>${all.length?`<span class="tiny muted">最近 ${all.length} 条</span>`:""}</div>
     ${logHtml}
   </div>`;
 }
@@ -1749,7 +1944,7 @@ W.redeemItem=id=>{
   const it=rdmItem(id);if(!it){toast("项目不存在");return;}
   const st=rdmStock(it);
   openModal(`<h3>兑换：${esc(it.name)}</h3>
-    <div class="field"><label class="lbl">学生</label><select class="fld" id="m_rs">${S.students.map(s=>`<option value="${s.id}">${esc(s.name)}（当前 ${rdmBalance(s.id)} 分）</option>`).join("")}</select></div>
+    <div class="field"><label class="lbl">学生</label>${(()=>{const ps=S.students.filter(s=>rdmBalance(s.id)>0);return ps.length?`<select class="fld" id="m_rs">${ps.map(s=>`<option value="${s.id}">${esc(s.name)}（可兑换 ${rdmBalance(s.id)} 分）</option>`).join("")}</select>`:`<div class="tiny muted">暂无「可兑换积分为正」的学生（需先有可兑换积分才能兑换奖励）</div>`;})()}</div>
     <div class="field row"><div style="flex:1"><label class="lbl">数量</label><input class="fld" id="m_rq" type="number" min="1" value="1" oninput="W.rdmTot()"></div>
       <div style="flex:1"><label class="lbl">单价（分）</label><input class="fld" id="m_rc" type="number" min="0" value="${+it.cost||0}" oninput="W.rdmTot()"></div></div>
     <div class="tiny muted" style="margin-bottom:10px">${esc(rdmCatName(it.catId))} · 库存 ${st===null?"不限量":st} · 合计 <b id="m_rtot">${+it.cost||0}</b> 分</div>
@@ -1769,14 +1964,66 @@ W.doRedeem=id=>{
   const st=rdmStock(it);
   if(st!==null&&st<qty){toast(st<=0?"库存已兑完":"库存不足，仅剩 "+st);return;}
   const total=cost*qty,bal=rdmBalance(sid);
-  if(bal<total){toast(studentName(sid)+" 积分不足（当前 "+bal+" 分，需 "+total+" 分）");return;}
+  if(bal<total){toast(studentName(sid)+" 可兑换积分不足（当前 "+bal+" 分，需 "+total+" 分）");return;}
   const time=nowStr();
-  S.points.scores[sid]=(S.points.scores[sid]||0)-total;
-  S.points.logs.push({id:uid(),studentId:sid,delta:-total,reason:"兑换·"+it.name+(qty>1?" ×"+qty:""),time:time,rdmId:id});
-  R.logs.push({id:uid(),studentId:sid,itemId:id,itemName:it.name,catName:rdmCatName(it.catId),cost:cost,qty:qty,time:time});
+  /* 只记兑换消耗（进入 S.redeem.logs，用于算「可兑换积分」），绝不改动 S.points.scores / S.points.logs（积分不变） */
+  R.logs.push({id:uid(),type:"reward",studentId:sid,itemId:id,itemName:it.name,catName:rdmCatName(it.catId),cost:cost,qty:qty,time:time});
   if(st!==null)it.stock=Math.max(0,st-qty);
   save();closeModal();refresh();
-  toast("已兑换 "+it.name+(qty>1?" ×"+qty:"")+"，扣除 "+total+" 分");
+  toast("已兑换 "+it.name+(qty>1?" ×"+qty:"")+"，消耗 "+total+" 可兑换积分");
+};
+/* ---- 消除扣分：用可兑换积分抵消扣分（不改动原积分） ---- */
+/* 消除分默认 = 兑换分 × 0.5（如笔芯兑换 10 分 → 消除 5 分）；弹窗内可手改 */
+const ELIM_RATE=0.5;
+function elimDefault(cost){return Math.round((+cost||0)*ELIM_RATE*100)/100;}
+W.eliminateStart=()=>{
+  if(!S.students.length){toast("请先添加学生");return;}
+  const R=ensureRedeem();
+  const elOpts=S.students.filter(s=>rdmBalance(s.id)<0);
+  const elHtml=elOpts.length?`<select class="fld" id="m_eli_s" onchange="W.elimTot()">${elOpts.map(s=>`<option value="${s.id}">${esc(s.name)}（可兑换 ${rdmBalance(s.id)} 分）</option>`).join("")}</select>`:`<div class="tiny muted">暂无「可兑换积分为负」的学生（没有待消除的扣分）</div>`;
+  const itemOpts=(R.items||[]).map(it=>`<option value="${esc(it.name)}"></option>`).join("");
+  openModal(`<h3>消除扣分</h3>
+    <div class="tiny muted" style="margin:2px 0 10px">仅显示可兑换积分为负（有待消除扣分）的学生。选物品自动按「兑换分 × 0.5」填入消除分（可手改），填数量；消除只<b>恢复「可兑换积分」、清除待消除扣分</b>，<b>不改动原积分</b>。</div>
+    <div class="field"><label class="lbl">学生</label>${elHtml}</div>
+    <div class="field"><label class="lbl">物品（同兑换页，可手动输入）</label>
+      <input class="fld" id="m_eli_item" list="m_eli_items" placeholder="选择或输入物品" autocomplete="off" oninput="W.elimItem()">
+      <datalist id="m_eli_items">${itemOpts}</datalist>
+    </div>
+    <div class="field row" style="gap:8px"><div style="flex:1;min-width:0"><label class="lbl">对应消除几分</label><input class="fld h30" id="m_eli_c" type="number" min="0" step="0.5" value="0" style="width:100%" oninput="W.elimTot()"></div>
+      <div style="flex:1;min-width:0"><label class="lbl">数量</label><input class="fld h30" id="m_eli_q" type="number" min="1" value="1" style="width:100%" oninput="W.elimTot()"></div></div>
+    <div class="tiny muted" style="margin:2px 0 10px">合计消除 <b id="m_eli_tot" style="color:var(--brand-ink)">0</b> 分（将恢复等额可兑换积分，不超过待消除扣分）</div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.eliminateDo()">确认消除</button></div>`);
+};
+/* 选/输物品后，按兑换页同名项目的「兑换分 × 0.5」自动填「对应消除几分」 */
+W.elimItem=()=>{
+  const inp=document.getElementById("m_eli_item"),c=document.getElementById("m_eli_c");
+  if(!inp||!c)return;
+  const name=(inp.value||"").trim();
+  const it=(ensureRedeem().items||[]).find(x=>x.name===name);
+  if(it)c.value=String(elimDefault(it.cost));
+  W.elimTot();
+};
+W.elimTot=()=>{
+  const q=parseFloat((document.getElementById("m_eli_q")||{}).value)||0;
+  const c=parseFloat((document.getElementById("m_eli_c")||{}).value)||0;
+  const t=document.getElementById("m_eli_tot");if(t)t.textContent=String(Math.round(q*c*100)/100);
+};
+W.eliminateDo=()=>{
+  const ss=document.getElementById("m_eli_s");const sid=ss?ss.value:"";
+  if(!sid){toast("请选择学生");return;}
+  const name=(document.getElementById("m_eli_item").value||"").trim();
+  if(!name){toast("请填写物品");return;}
+  const cost=Math.max(0,parseFloat(document.getElementById("m_eli_c").value)||0);
+  const qty=Math.max(1,parseFloat(document.getElementById("m_eli_q").value)||1);
+  const total=Math.round(cost*qty*100)/100,bal=rdmBalance(sid);
+  if(bal>=0){toast(studentName(sid)+" 当前没有待消除扣分（可兑换积分非负）");return;}
+  const debt=-bal;
+  if(total>debt){toast(studentName(sid)+" 消除超过待消除扣分（最多可消除 "+debt+" 分）");return;}
+  const time=nowStr();
+  /* 只记一条「消除扣分」记录：恢复 total(=cost*qty) 可兑换积分（清除待消除扣分），S.points 原积分不动 */
+  ensureRedeem().logs.push({id:uid(),type:"eliminate",studentId:sid,itemName:name,cost:cost,qty:qty,eliminated:total,time:time});
+  save();closeModal();refresh();
+  toast("已消除「"+name+(qty>1?" ×"+qty:"")+"」 "+total+" 分扣分，恢复 "+total+" 可兑换积分");
 };
 /* ---- 管理分类与项目 ---- */
 function redeemMgrHtml(){
@@ -1839,7 +2086,7 @@ W.rdmUpdItem=(id,k,v)=>{
 };
 
 /* ============ LOTTERY ============ */
-let rollTimer=null;
+let rollTimer=null,punRollTimer=null;
 /* 抽签：候选池随「允许重复」开关变化；不重复=未抽过的人，重复=全部学生 */
 function lotPool(){
   const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false});
@@ -1857,11 +2104,42 @@ function refreshLotLists(){
   const el=document.getElementById("lotLists");if(el)el.innerHTML=lotListsHtml();
   const btn=document.getElementById("drawBtn");if(btn)btn.disabled=lotRemain()<=0;
 }
+/* ---- 惩罚抽取：列表 / 记录 ---- */
+function lotPuns(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.puns))cfg.puns=DEFAULT_PUNS();return cfg.puns;}
+function lotPunLogs(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.punLogs))cfg.punLogs=[];return cfg.punLogs;}
+function punLogsHtml(){
+  const logs=lotPunLogs(),puns=lotPuns();
+  const recent=logs.slice().reverse().slice(0,40);
+  const doneN=logs.filter(l=>l.done).length;
+  const head=`<div class="between row wrap" style="margin-bottom:10px">
+      <span class="section-title" style="margin:0">惩罚记录（${logs.length}${logs.length?` · 已完成 ${doneN}`:""}）</span>
+      ${logs.length?`<button class="btn ghost sm h30" onclick="W.clearPunLogs()">清空记录</button>`:""}
+    </div>`;
+  if(!recent.length)return head+`<div class="empty">还没有惩罚记录</div>`;
+  return head+recent.map((l,i)=>`<div class="pun-log${l.done?" done":""}">
+      <label class="chk" title="${l.done?"已完成，点此取消":"打勾表示惩罚已执行"}">
+        <input type="checkbox" ${l.done?"checked":""} onchange="W.togglePunDone('${l.id}')">
+      </label>
+      <span class="no">${logs.length-i}</span>
+      <div class="txt" style="flex:1;min-width:0">
+        <div><b>${esc(l.stuName||studentName(l.studentId))}</b> · ${esc(l.name||"")}</div>
+        <div class="tiny muted">${esc(l.time||"")}${l.done?` · <span style="color:var(--ok)">已完成</span>`:""}</div>
+      </div>
+    </div>`).join("");
+}
+function refreshPunLists(){
+  const el=document.getElementById("punLists");if(el)el.innerHTML=punLogsHtml();
+  const btn=document.getElementById("punBtn");if(btn)btn.disabled=!(lotPuns().length&&S.students.length);
+}
 function viewLottery(v){
-  const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false});
+  const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]});
   if(!Array.isArray(cfg.drawn))cfg.drawn=[];
+  if(!Array.isArray(cfg.puns))cfg.puns=DEFAULT_PUNS();
+  if(!Array.isArray(cfg.punLogs))cfg.punLogs=[];
   const rep=!!cfg.allowRepeat;
   const remain=lotRemain();
+  const puns=cfg.puns,logs=cfg.punLogs;
+  const last=logs.length?logs[logs.length-1]:null;
   v.innerHTML=`
   <div class="card pad" style="margin-bottom:14px">
     <div class="lottery-stage" id="lotStage"><span class="lbl" id="lotLbl">待抽取：${remain} / ${S.students.length}</span>🎯</div>
@@ -1873,7 +2151,23 @@ function viewLottery(v){
       </label>
     </div>
   </div>
-  <div class="card pad" id="lotLists">${lotListsHtml()}</div>`;
+  <div class="card pad" id="lotLists">${lotListsHtml()}</div>
+  <div class="card pad" style="margin-top:14px">
+    <div class="between row wrap" style="margin-bottom:10px">
+      <span class="section-title" style="margin:0">惩罚抽取</span>
+      <button class="btn ghost sm h30" onclick="W.managePuns()">管理惩罚</button>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label class="lbl">学生</label>
+      ${S.students.length?`<select class="fld h30" id="punStu" style="width:100%">${S.students.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>`:`<div class="tiny muted">名册里还没有学生</div>`}
+    </div>
+    <div class="lottery-stage pun" id="punStage"><span class="lbl" id="punLbl">共 ${puns.length} 条惩罚${logs.length?` · 已抽 ${logs.length} 次`:""}</span>${last?esc(last.name):"🎯"}</div>
+    <div class="row wrap" style="margin-top:14px;gap:8px">
+      <button class="btn" id="punBtn" onclick="W.drawPun()" ${(puns.length&&S.students.length)?"":"disabled"}>🎯 抽惩罚</button>
+      <span class="tiny muted" style="align-self:center">先选定学生，再随机抽一条惩罚，结果自动记入下方记录</span>
+    </div>
+  </div>
+  <div class="card pad" id="punLists" style="margin-top:14px">${punLogsHtml()}</div>`;
 }
 
 /* ============ SCHEDULE ============ */
@@ -1888,10 +2182,11 @@ function subjColor(sub){
 }
 /* 上课时间 {s,e} → "08:00-08:45"；只有一端则只显示一端；都为空返回 "" */
 function tRange(o){const s=(o&&o.s)||"",e=(o&&o.e)||"";if(s&&e)return s+"-"+e;return s||e||"";}
-/* 时间输入对：起 / 止两个 type=time，值形如 "08:00" */
+/* 时间输入对：起 / 止两个 type=time，值形如 "08:00"。
+   排版与同弹窗的「星期 / 节次」完全相同：一行两个等宽列、底对齐、可收缩。 */
 function timeFields(idS,idE,o){
-  return `<div class="field row"><div style="flex:1"><label class="lbl">开始时间</label><input class="fld" type="time" id="${idS}" value="${esc((o&&o.s)||"")}"></div>
-    <div style="flex:1"><label class="lbl">结束时间</label><input class="fld" type="time" id="${idE}" value="${esc((o&&o.e)||"")}"></div></div>`;
+  return `<div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">开始时间</label><input class="fld" type="time" id="${idS}" value="${esc((o&&o.s)||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">结束时间</label><input class="fld" type="time" id="${idE}" value="${esc((o&&o.e)||"")}"></div></div>`;
 }
 function readTime(idS,idE){return {s:($("#"+idS).value||"").trim(),e:($("#"+idE).value||"").trim()};}
 function viewSchedule(v){
@@ -1902,7 +2197,7 @@ function viewSchedule(v){
     const c=S.schedule.cells[d+"-"+p];
     const add=`<button class="cell-add" title="${c?"修改这一格":"添加课程"}" onclick="W.editCell('${d}','${p}')">${c?"✎":"+"}</button>`;
     const phone=c&&c.tel?`<a class="cell-phone" href="tel:${esc(c.tel)}" title="拨打 ${esc(c.tch||"任课老师")} ${esc(c.tel)}">☎</a>`:"";
-    return `<div class="cell ${today?'today':''}" style="border-left-color:${subjColor(c&&c.sub)}">${c?`<div class="sub"><span>${esc(c.sub)}</span></div>${c.tch?`<div class="tch">${esc(c.tch)}</div>`:""}<div class="btns">${phone}${add}</div>`:add}</div>`;
+    return `<div class="cell ${today?'today':''}" style="border-left-color:${subjColor(c&&c.sub)}">${c?`<div class="sub"><span>${esc(c.sub)}</span></div>${c.tch?`<div class="tch">${esc(c.tch)}</div>`:""}<div class="btns">${add}${phone}</div>`:add}</div>`;
   };
   /* 节次行：行首「第N节」+ 该节次上课时间 */
   const pRow=(p,label,timeStr)=>{
@@ -1920,19 +2215,17 @@ function viewSchedule(v){
   for(let p=1;p<=per;p++)rows+=pRow(p,"第"+p+"节",tRange(S.schedule.times[p]));
   evRows.forEach(ek=>rows+=pRow(ek,periodLabel(ek),tRange((S.schedule.times||{})[ek])));
   v.innerHTML=`
-  <div class="between row wrap" style="margin-bottom:12px">
-    <div class="row tiny muted">默认 8 节，随添加自动增加，最多 12 节</div>
+  <div class="row wrap" style="justify-content:flex-end;margin-bottom:12px">
     <div class="row">
+      <button class="btn ghost sm h30" onclick="W.manageTerms()" title="学期管理（归档的学期不出现在时间范围选项里）">学期</button>
       <button class="btn ghost sm h30" onclick="W.saveSchedRecord()" title="把当前课表保存为一条课表记录，存进历史记录，可随时恢复">记录</button>
-      <button class="btn ghost sm h30" onclick="W.clearSchedule()">清空</button>
       <button class="btn ghost sm h30" onclick="W.importSchedule()">导入</button>
       <button class="btn ghost sm h30" onclick="W.exportSchedule()">导出</button>
-      <button class="btn ghost sm h30" onclick="W.manageTerms()" title="学期管理（归档的学期不出现在时间范围选项里）">学期</button>
+      <button class="btn ghost sm h30" onclick="W.clearSchedule()">清空</button>
       <button class="btn sm h30" onclick="W.addSchedule()">+ 添加</button>
     </div>
   </div>
-  <div class="card pad"><div class="sched-scroll"><div class="sched">${head}${rows}</div></div>
-  <div class="tiny muted" style="margin-top:10px">格子三行：科目 / 任课老师 / 电话键＋修改键。电话键（☎）点一下直接拨号（手机端唤起拨号，桌面端交给已关联的拨号应用）；「修改 / 添加」键（✎）编辑课程。左侧竖条颜色代表科目，同科目同色。高亮列为今天。「添加课程」的「节次」里可直接选「早自习 / 晚自习一 / 晚自习二 / 晚自习三」，有课的对应行才会出现（早自习在第一节之前、晚自习一/二/三依次在最后一节之后），上课时间、联系方式在那里一并设置。</div></div>`;
+  <div class="card pad"><div class="sched-scroll"><div class="sched">${head}${rows}</div></div></div>`;
 }
 
 /* ============ WORK ============ */
@@ -2032,38 +2325,39 @@ W.sortRoster=k=>{
 };
 W.delStudent=id=>{if(!confirm("删除该学生？相关成绩/积分记录会保留为孤立数据。"))return;S.students=S.students.filter(s=>s.id!==id);save();refresh();};
 W.importRoster=()=>{
-  openModal(`<h3>CSV 导入学生</h3>
-    <div class="field"><label class="lbl">选择 CSV 文件（UTF-8）</label><input type="file" id="m_csv" accept=".csv" class="fld"></div>
-    <div class="tiny muted">列：学号,姓名,家长电话,学习组,性别,身高（按导出顺序去掉等级/备注）。带表头时按列名自动匹配，顺序可任意；导入将追加到现有名单。</div>
-    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doImport()">导入</button></div>`);
+  /* 点击即弹出系统文件选择窗口，不再经弹窗中转 */
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    const r=applyRosterText(text);
+    if(r.empty){toast("文件为空");return;}
+    save();refresh();toast("已导入 "+r.n+" 人");
+  }));
 };
-W.doImport=()=>{
-  const f=$("#m_csv").files[0];if(!f){toast("请选择文件");return;}
-  const r=new FileReader();r.onload=()=>{
-    const lines=r.result.split(/\r?\n/).filter(l=>l.trim());
-    if(!lines.length){toast("文件为空");return;}
-    const cells=l=>l.split(/[,，]/).map(x=>x.trim());
-    const HMAP={"学号":"no","姓名":"name","名字":"name","等级":"tier","家长电话":"phone","电话":"phone",
-      "备注":"note","学习组":"g","组":"g","性别":"sex","身高":"height"};
-    const head=cells(lines[0]);
-    let map=null,start=0;
-    if(head.filter(h=>HMAP[h]).length>=2){map={};head.forEach((h,i)=>{if(HMAP[h]&&map[HMAP[h]]===undefined)map[HMAP[h]]=i;});start=1;}
-    /* 无表头时的位置顺序（与导出顺序去掉等级/备注后一致） */
-    const POS=["no","name","phone","g","sex","height"];
-    const get=(c,k,d)=>{
-      let v;
-      if(map)v=map[k]!==undefined?c[map[k]]:"";
-      else{const i=POS.indexOf(k);v=i>=0?(c[i]||""):"";}
-      return v===""?d:v;
-    };
-    let n=0;for(let i=start;i<lines.length;i++){
-      const c=cells(lines[i]);
-      const name=get(c,"name","");if(!name)continue;
-      S.students.push({id:uid(),name,no:get(c,"no",""),sex:get(c,"sex","男")||"男",
-        g:get(c,"g",""),tier:"",phone:get(c,"phone",""),height:+get(c,"height",0)||0,note:get(c,"note","")});n++;}
-    save();closeModal();refresh();toast("已导入 "+n+" 人");
-  };r.readAsText(f,"UTF-8");
-};
+/* 解析名册 CSV 文本并追加到名单；返回 {n,empty}（纯函数） */
+function applyRosterText(txt){
+  const lines=String(txt||"").replace(/^\ufeff/,"").split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length)return {n:0,empty:true};
+  const cells=l=>l.split(/[,，]/).map(x=>x.trim());
+  const HMAP={"学号":"no","姓名":"name","名字":"name","等级":"tier","家长电话":"phone","电话":"phone",
+    "备注":"note","学习组":"g","组":"g","性别":"sex","身高":"height"};
+  const head=cells(lines[0]);
+  let map=null,start=0;
+  if(head.filter(h=>HMAP[h]).length>=2){map={};head.forEach((h,i)=>{if(HMAP[h]&&map[HMAP[h]]===undefined)map[HMAP[h]]=i;});start=1;}
+  /* 无表头时的位置顺序（与导出顺序去掉等级/备注后一致） */
+  const POS=["no","name","phone","g","sex","height"];
+  const get=(c,k,d)=>{
+    let v;
+    if(map)v=map[k]!==undefined?c[map[k]]:"";
+    else{const i=POS.indexOf(k);v=i>=0?(c[i]||""):"";}
+    return v===""?d:v;
+  };
+  let n=0;for(let i=start;i<lines.length;i++){
+    const c=cells(lines[i]);
+    const name=get(c,"name","");if(!name)continue;
+    S.students.push({id:uid(),name,no:get(c,"no",""),sex:get(c,"sex","男")||"男",
+      g:get(c,"g",""),tier:"",phone:get(c,"phone",""),height:+get(c,"height",0)||0,note:get(c,"note","")});n++;}
+  return {n};
+}
 W.gotoRoster=id=>{location.hash="roster";};
 W.newExam=()=>{
   openModal(`<h3>新建考试</h3>
@@ -2086,7 +2380,7 @@ W.editExam=id=>{const ex=el(id,S.exams);openModal(`<h3>编辑考试</h3>
   <div class="tiny muted">修改科目不会删除已有分数，仅调整表头。</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doEditExam('${id}')">保存</button></div>`);};
 W.doEditExam=id=>{const ex=el(id,S.exams);ex.name=$("#m_en").value.trim();ex.date=$("#m_ed").value;ex.subjects=$("#m_es").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);save();closeModal();refresh();};
-W.setScore=(eid,sid,sub,val)=>{const ex=el(eid,S.exams);ex.scores[sid][sub]=val===""?undefined:val;save();};
+W.setScore=(eid,sid,sub,val)=>{const ex=el(eid,S.exams);if(!ex.scores[sid])ex.scores[sid]={};ex.scores[sid][sub]=val===""?undefined:val;const cnt=applyGradeRules(ex);save();setTimeout(()=>{if(gradeExam===eid)viewGrades(document.getElementById("view"));},0);if(cnt)toast("已按成绩记分 "+cnt+" 条");};
 W.exportGrades=id=>{const ex=el(id,S.exams);let csv="姓名,"+ex.subjects.join(",")+",总分,平均,排名\n";
   const ranks=gradeRanks(ex);
   S.students.forEach(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
@@ -2132,7 +2426,7 @@ if(!W.__behDDInit){W.__behDDInit=true;document.addEventListener("click",e=>{
 W.addBehavior=(sid)=>{
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
   const firstK=types.some(t=>t.k==="表扬")?"表扬":types[0].k;
-  openModal(`<h3>快速记录</h3>
+  openModal(`<h3>记录</h3>
     <div class="field"><label class="lbl">学生</label><select class="fld" id="m_bs">${S.students.map(s=>`<option value="${s.id}" ${sid&&s.id===sid?"selected":""}>${esc(s.name)}</option>`).join("")}</select></div>
     <div class="field"><label class="lbl">时间</label><input class="fld" id="m_btime" type="datetime-local" value="${nowLocal()}"></div>
     <div class="field row"><div style="flex:1"><label class="lbl">类型（可输入新类型）</label>
@@ -2215,76 +2509,187 @@ W.delBehavior=id=>{
 };
 /* ---- 类别管理 ---- */
 W.manageBehTypes=()=>{
+  ensureGradeType();/* 老数据没有「成绩」类别时按需补上 */
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
   const row=t=>`<div class="r-item" style="padding:7px 0">
     <input class="fld" style="flex:1;min-width:0;padding:5px 8px" value="${esc(t.k)}" onchange="W.renameBehType('${esc(t.k)}',this.value)">
     <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${t.pts||0}" title="分值：正为加分，负为扣分" onchange="W.setBehTypePts('${esc(t.k)}',this.value)">
     <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;
+  const R=gradeRules();
+  const ruleRow=([k,label])=>`<div class="r-item" style="padding:7px 0">
+    <span style="flex:1;min-width:0;font-size:13px">${esc(label)}</span>
+    <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${R[k]}" title="分值：正为加分，负为扣分；改 0 则该项不加减" onchange="W.setGradeRule('${k}',this.value)"></div>`;
   openModal(`<div class="between row" style="margin-bottom:8px"><h3 style="margin:0">行为类别</h3><button class="btn ghost sm" onclick="closeModal()">关闭</button></div>
   <div class="tiny muted" style="margin-bottom:8px">名称可改；分值正数加分、负数扣分，记录时按此自动计入总积分。改名会同步更新已有记录。</div>
   ${types.map(row).join("")}
   <div class="r-item" style="padding:7px 0">
     <input class="fld" id="m_btk" style="flex:1;min-width:0;padding:5px 8px" placeholder="新类别名称">
     <input class="fld" id="m_btp" style="width:76px;padding:5px 8px" type="number" value="0" title="默认分值">
-    <button class="btn sm" onclick="W.addBehType()">添加</button></div>`);
+    <button class="btn sm" onclick="W.addBehType()">添加</button></div>
+  <div style="border-top:1px solid var(--line);margin:14px 0 4px"></div>
+  <div class="section-title" style="margin:8px 0 6px">成绩规则</div>
+  <div class="tiny muted" style="margin-bottom:8px">导入成绩后按此自动录入「${GRADE_TYPE}」记录（每人每场考试合并成 1 条，事由里列各科明细）。同一场考试重新导入会覆盖上次的自动记录，不会重复计分。</div>
+  ${GRADE_RULE_LABELS.map(ruleRow).join("")}`);
 };
 W.renameBehType=(old,nv)=>{
-  nv=nv.trim();if(!nv||nv===old){W.manageBehTypes();return;}
-  if((Array.isArray(S.behTypes)?S.behTypes:[]).some(x=>x.k===nv)){toast("已有同名类别");W.manageBehTypes();return;}
+  nv=nv.trim();if(!nv||nv===old){W.renderBehTypes();return;}
+  if((Array.isArray(S.behTypes)?S.behTypes:[]).some(x=>x.k===nv)){toast("已有同名类别");W.renderBehTypes();return;}
   const t=(Array.isArray(S.behTypes)?S.behTypes:[]).find(x=>x.k===old);
   if(t)t.k=nv;
   S.behaviors.forEach(b=>{if(b.type===old)b.type=nv;});
   S.points.logs.forEach(l=>{if(l.behId&&l.reason&&l.reason.startsWith("行为·"+old))l.reason=l.reason.replace("行为·"+old,"行为·"+nv);});
   if(behFilter===old)behFilter=nv;
-  save();W.manageBehTypes();if((location.hash||"")==="#behavior")viewBehavior(document.getElementById("view"));
+  save();W.renderBehTypes();
 };
 W.setBehTypePts=(k,val)=>{
-  const t=btype(k);if(t.k!==k){W.manageBehTypes();return;}
+  const t=btype(k);if(t.k!==k){W.renderBehTypes();return;}
   t.pts=Math.max(-99,Math.min(99,parseInt(val,10)||0));
-  save();W.manageBehTypes();
+  save();W.renderBehTypes();
 };
 W.addBehType=()=>{
   const k=$("#m_btk").value.trim();if(!k){toast("请填名称");return;}
   if((Array.isArray(S.behTypes)?S.behTypes:[]).some(x=>x.k===k)){toast("已有同名类别");return;}
   const pts=Math.max(-99,Math.min(99,parseInt($("#m_btp").value,10)||0));
   (Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES())).push({k,c:"brand",pts});
-  save();W.manageBehTypes();
+  save();W.renderBehTypes();
 };
 W.delBehType=k=>{
   if(!confirm("删除类别「"+k+"」？已有记录保留该类型文字，仅不再出现在筛选和下拉里。"))return;
   if(Array.isArray(S.behTypes))S.behTypes=S.behTypes.filter(t=>t.k!==k);
   if(behFilter===k)behFilter="";
-  save();W.manageBehTypes();if((location.hash||"")==="#behavior")viewBehavior(document.getElementById("view"));
+  save();W.renderBehTypes();
 };
+/* 重渲染：在「行为类别」页面时刷新页面，否则退回原弹窗 */
+W.renderBehTypes=()=>{
+  if((location.hash||"")==="#behtypes") viewBehTypes(document.getElementById("view"));
+  else W.manageBehTypes();
+};
+/* 行为类别：整页（替代原弹窗），含导入 / 导出 */
+function viewBehTypes(v){
+  ensureGradeType();
+  const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
+  const row=t=>`<div class="r-item" style="padding:7px 0">
+    <input class="fld" style="flex:1;min-width:0;padding:5px 8px" value="${esc(t.k)}" onchange="W.renameBehType('${esc(t.k)}',this.value)">
+    <span class="chip ${t.c}" style="padding:1px 8px;font-size:11.5px;flex:none">${esc(t.k)}</span>
+    <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${t.pts||0}" title="分值：正为加分，负为扣分" onchange="W.setBehTypePts('${esc(t.k)}',this.value)">
+    <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;
+  const R=gradeRules();
+  const ruleRow=([k,label])=>`<div class="r-item" style="padding:7px 0">
+    <span style="flex:1;min-width:0;font-size:13px">${esc(label)}</span>
+    <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${R[k]}" title="分值：正为加分，负为扣分；改 0 则该项不加减" onchange="W.setGradeRule('${k}',this.value)"></div>`;
+  v.innerHTML=`
+  <div class="card pad">
+    <div class="between row wrap" style="margin-bottom:12px">
+      <div class="row" style="gap:6px">
+        <button class="btn ghost sm h30" onclick="location.hash='#behavior'">← 行为记录</button>
+        <span class="section-title" style="margin:0">行为类别</span>
+      </div>
+      <span class="row" style="gap:6px;flex:none">
+        <button class="btn ghost sm h30" onclick="W.importBehTypes()">导入</button>
+        <button class="btn ghost sm h30" onclick="W.exportBehTypes()">导出</button>
+      </span>
+    </div>
+    <div class="tiny muted" style="margin-bottom:8px">名称可改；分值正数加分、负数扣分，记录时按此自动计入总积分。改名会同步更新已有记录。</div>
+    ${types.map(row).join("")}
+    <div class="r-item" style="padding:7px 0">
+      <input class="fld" id="m_btk" style="flex:1;min-width:0;padding:5px 8px" placeholder="新类别名称">
+      <input class="fld" id="m_btp" style="width:76px;padding:5px 8px" type="number" value="0" title="默认分值">
+      <button class="btn sm" onclick="W.addBehType()">添加</button></div>
+    <div style="border-top:1px solid var(--line);margin:14px 0 4px"></div>
+    <div class="section-title" style="margin:8px 0 6px">成绩规则</div>
+    <div class="tiny muted" style="margin-bottom:8px">导入成绩后按此自动录入「${GRADE_TYPE}」记录（每人每场考试合并成 1 条，事由里列各科明细）。同一场考试重新导入会覆盖上次的自动记录，不会重复计分。</div>
+    ${GRADE_RULE_LABELS.map(ruleRow).join("")}
+  </div>`;
+}
+/* 导出：类别配置（名称/颜色/分值）+ 成绩规则，存为 JSON */
+W.exportBehTypes=()=>{
+  const R=gradeRules();
+  const cfg={behTypes:(S.behTypes||[]).map(t=>({k:t.k,c:t.c,pts:t.pts})),gradeRules:{}};
+  GRADE_RULE_LABELS.forEach(([k])=>cfg.gradeRules[k]=R[k]);
+  downloadJSON("行为类别配置",cfg);
+};
+W.importBehTypes=()=>{
+  /* 点击即弹出系统文件选择窗口 */
+  pickFile(".json,application/json",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    applyBehTypesText(text);
+  }));
+};
+/* 解析行为类别配置 JSON 并覆盖写入；返回 true/false（纯函数） */
+function applyBehTypesText(text){
+  try{
+    const cfg=JSON.parse(text);
+    if(!cfg||!Array.isArray(cfg.behTypes)){toast("文件格式不正确");return false;}
+    S.behTypes=cfg.behTypes.map(t=>({k:String(t.k||"").trim(),c:t.c||"brand",pts:Math.max(-99,Math.min(99,parseInt(t.pts,10)||0))})).filter(t=>t.k);
+    if(cfg.gradeRules&&typeof cfg.gradeRules==="object"){const R=gradeRules();GRADE_RULE_LABELS.forEach(([k])=>{if(k in cfg.gradeRules)R[k]=Math.max(-99,Math.min(99,parseInt(cfg.gradeRules[k],10)||0));});}
+    ensureGradeType();save();closeModal();W.renderBehTypes();toast("已导入 "+S.behTypes.length+" 个类别");
+    return true;
+  }catch(e){toast("解析失败：文件不是有效 JSON");return false;}
+}
 
-/* ============ 班级工作（职务 + 按周期自动加分） ============ */
-/* 周期键：day=今天；week=本周一。同一职务 + 同一学生 + 同一周期只计一次（幂等） */
-function jobPeriodKey(cycle){
-  const d=new Date();const p=n=>n.toString().padStart(2,"0");
+/* ============ 班级工作（职务 + 周期末自动加分） ============ */
+/* 周期键：day=当天；week=本周一；month=本月。前缀区分类型，避免跨类型误判。
+   同一职务 + 同一学生 + 同一周期只计一次（幂等）。 */
+function jobPeriodKey(cycle,d){
+  d=d||new Date();const p=n=>n.toString().padStart(2,"0");
   if(cycle==="week"){
     const off=(d.getDay()+6)%7;/* 周一=0 */
     const m=new Date(d);m.setDate(d.getDate()-off);
-    return m.getFullYear()+"-"+p(m.getMonth()+1)+"-"+p(m.getDate());
+    return "W"+m.getFullYear()+"-"+p(m.getMonth()+1)+"-"+p(m.getDate());
   }
-  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+  if(cycle==="month")return "M"+d.getFullYear()+"-"+p(d.getMonth()+1);
+  return "D"+d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
 }
-const jobCycleText=c=>c==="week"?"每周":"每天";
-/* 自动结算：把本期尚未计入的职务加分写入积分；返回本次新增条数 */
-function applyJobPoints(){
+const jobCycleText=c=>c==="week"?"每周":c==="month"?"每月":"每天";
+/* 自动记录时刻说明：每天 / 每周日 / 每月末 的最后一分钟 */
+const jobCycleLabel=c=>c==="week"?"每周日 23:59 自动记录":c==="month"?"每月末 23:59 自动记录":"每天 23:59 自动记录";
+function parseYMD(s){const a=String(s||"").split("-").map(Number);return new Date(a[0]||1970,(a[1]||1)-1,a[2]||1);}
+/* 周期起止：返回 {start:Date(00:00), end:Date(23:59:59.999)} */
+function jobPeriodSpan(cycle,key){
+  const p=n=>n.toString().padStart(2,"0");const a=key.slice(1).split("-");const y=+a[0],m=+a[1],d=+a[2];
+  if(cycle==="month"){const start=new Date(y,m-1,1);const end=new Date(y,m,0,23,59,59,999);return{start,end};}
+  if(cycle==="week"){const start=new Date(y,m-1,d);const end=new Date(y,m-1,d+6,23,59,59,999);return{start,end};}
+  const start=new Date(y,m-1,d);const end=new Date(y,m-1,d,23,59,59,999);return{start,end};
+}
+/* 周期平移 k 步：day 加 k 天；week 加 k 周；month 加 k 月。返回新 key */
+function jobPeriodShift(cycle,key,k){
+  const sp=jobPeriodSpan(cycle,key);const d=new Date(sp.start);
+  if(cycle==="week")d.setDate(d.getDate()+7*k);else if(cycle==="month")d.setMonth(d.getMonth()+k);else d.setDate(d.getDate()+k);
+  return jobPeriodKey(cycle,d);
+}
+/* 是否处于某周期最后 2 分钟内（命中「周期最后一分钟自动记录」） */
+function jobInFinalMinute(cycle,now){
+  now=now||new Date();const cur=jobPeriodKey(cycle,now);const end=jobPeriodSpan(cycle,cur).end;
+  const ms=end.getTime()-now.getTime();return ms>=0&&ms<=120000;
+}
+/* 自动结算：周期最后一分钟（或周期已结束后页面再次打开时）按周期计入职务加分。
+   不立即算分：只记「已结束的周期」；当前周期未结束不记；可补记中间漏掉的若干周期（gap）。
+   返回本次新增条数。 */
+function runJobAuto(){
   const jobs=Array.isArray(S.classJobs)?S.classJobs:[];
   if(!jobs.length)return 0;
   const logs=S.points.logs||(S.points.logs=[]);
+  const now=new Date();
   let n=0;
   jobs.forEach(j=>{
     const pts=+j.pts||0;
     if(!pts)return;
-    const key=jobPeriodKey(j.cycle);
+    if(!j.created)j.created=nowStr().slice(0,10);/* 旧数据懒迁移：从今天起算，不回补历史 */
+    const curKey=jobPeriodKey(j.cycle,now);
+    const toKey=jobInFinalMinute(j.cycle,now)?curKey:jobPeriodShift(j.cycle,curKey,-1);/* 最晚可记：最后一分钟含当前，否则取上一（已结束）周期 */
     (j.studentIds||[]).forEach(sid=>{
       if(!(S.students||[]).some(s=>s.id===sid))return;
-      if(logs.some(l=>l.jobId===j.id&&l.studentId===sid&&l.period===key))return;
-      S.points.scores[sid]=(S.points.scores[sid]||0)+pts;
-      logs.push({id:uid(),studentId:sid,delta:pts,reason:"职务·"+j.name,time:nowStr(),jobId:j.id,period:key});
-      n++;
+      const lastLog=logs.filter(l=>l.jobId===j.id&&l.studentId===sid).sort((a,b)=>a.period<b.period?-1:1).pop();
+      const fromKey=lastLog?jobPeriodShift(j.cycle,lastLog.period,1):jobPeriodKey(j.cycle,parseYMD(j.created));
+      let key=fromKey,guard=0;
+      while(key<=toKey&&guard++<600){
+        if(!logs.some(l=>l.jobId===j.id&&l.studentId===sid&&l.period===key)){
+          S.points.scores[sid]=(S.points.scores[sid]||0)+pts;
+          logs.push({id:uid(),studentId:sid,delta:pts,reason:"职务·"+j.name,time:nowStr(),jobId:j.id,period:key});
+          n++;
+        }
+        key=jobPeriodShift(j.cycle,key,1);
+      }
     });
   });
   if(n)save();
@@ -2328,11 +2733,8 @@ function viewJobs(v){
   const jobHtml=jobs.length?jobs.map(j=>{
     const pts=+j.pts||0;
     const ids=(j.studentIds||[]).filter(sid=>(S.students||[]).some(s=>s.id===sid));
-    const key=jobPeriodKey(j.cycle);
-    const done=ids.filter(sid=>(S.points.logs||[]).some(l=>l.jobId===j.id&&l.studentId===sid&&l.period===key)).length;
     const st=!ids.length?`<span class="chip">未指定学生</span>`
-      :done>=ids.length?`<span class="chip ok">本期已计入 ${done}/${ids.length}</span>`
-      :`<span class="chip warn">本期待计入 ${ids.length-done} 人</span>`;
+      :`<span class="chip brand">${jobCycleLabel(j.cycle)}</span>`;
     return `<div class="r-item">
       <span class="r-dot" style="background:var(--brand);color:var(--brand)"></span>
       <div style="flex:1;min-width:0">
@@ -2371,7 +2773,7 @@ function viewJobs(v){
         <button onclick="W.editTeacher('${t.id}')" title="改名 / 改科目 / 改电话（不归档）">改</button>
         <button class="del" onclick="W.delTeacher('${t.id}')">删</button>
       </span></div>`;
-  }).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">🧑‍🏫</div>还没有科任老师，点「+ 添加科任老师」开始</div>`;
+  }).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">🧑‍🏫</div>还没有科任老师，点「添加」开始</div>`;
 
   /* 历史任职表 */
   const sortedHist=hist.slice().sort((a,b)=>(b.to||b.from||"").localeCompare(a.to||a.from||""));
@@ -2390,10 +2792,10 @@ function viewJobs(v){
     <div class="between row wrap" style="margin-bottom:12px">
       <div>
         <span class="section-title" style="margin:0">班级管理</span>
-        <div class="tiny muted">设置职务、周期与分值，系统自动按周期计入积分；换届按钮把当前担任学生归档到历史。</div>
+        <div class="tiny muted">自动积分</div>
       </div>
-      <div class="row">
-        <button class="btn ghost sm" onclick="W.runJobPoints()" title="把本期尚未计入的职务加分立即写入积分">立即结算</button>
+      <div class="row" style="margin-left:auto">
+        <button class="btn ghost sm" onclick="W.runJobPoints()" title="立即记录当前周期职务加分（测试 / 补记用；平时由系统在周期末自动记）">立即结算</button>
         <button class="btn sm" onclick="W.editJob('')">+ 添加职务</button>
       </div>
     </div>
@@ -2401,12 +2803,9 @@ function viewJobs(v){
   </div>
   <div class="card pad" style="margin-bottom:14px">
     <div class="between row wrap" style="margin-bottom:12px">
-      <div>
-        <span class="section-title" style="margin:0">科任老师</span>
-        <div class="tiny muted">仅作信息记录（含姓名 / 任课科目 / 联系电话），不参与积分；换届按钮把当前老师归档到历史。</div>
-      </div>
+      <span class="section-title" style="margin:0">科任老师</span>
       <div class="row">
-        <button class="btn sm" onclick="W.editTeacher('')">+ 添加科任老师</button>
+        <button class="btn sm" onclick="W.editTeacher('')">添加</button>
       </div>
     </div>
     ${teacherHtml}
@@ -2439,11 +2838,12 @@ W.editJob=id=>{
     <div class="field row">
       <div style="flex:1"><label class="lbl">周期</label><select class="fld" id="m_jc">
         <option value="day" ${cyc==="day"?"selected":""}>每天</option>
-        <option value="week" ${cyc==="week"?"selected":""}>每周</option></select></div>
+        <option value="week" ${cyc==="week"?"selected":""}>每周</option>
+        <option value="month" ${cyc==="month"?"selected":""}>每月</option></select></div>
       <div style="flex:1"><label class="lbl">做到好加分</label><input class="fld" id="m_jp" type="number" value="${j?(+j.pts||0):1}"></div>
     </div>
     <div class="field"><label class="lbl">担任学生</label>${box}</div>
-    <div class="tiny muted" style="margin-bottom:10px">保存后若本期尚未计入，会立即自动计入积分。</div>
+    <div class="tiny muted" style="margin-bottom:10px">保存后<b>不立即算分</b>，将在周期结束的最后一分钟自动计入积分（每天 / 每周日 / 每月末 23:59）。</div>
     <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveJob('${id||""}')">保存</button></div>`);
 };
 W.saveJob=id=>{
@@ -2455,10 +2855,9 @@ W.saveJob=id=>{
   const ids=Array.from(document.querySelectorAll(".jstu:checked")).map(x=>x.value);
   const j=id?el(id,jobs):null;
   if(j){j.name=name;j.cycle=cycle;j.pts=pts;j.studentIds=ids;}
-  else jobs.push({id:uid(),name,cycle,pts,studentIds:ids});
+  else jobs.push({id:uid(),name,cycle,pts,studentIds:ids,created:nowStr().slice(0,10)});
   save();
-  const n=applyJobPoints();
-  closeModal();refresh();toast(n?"已保存，本次计入 "+n+" 条职务加分":"已保存");
+  closeModal();refresh();toast("已保存，将在"+jobCycleLabel(cycle)+"计入积分");
 };
 W.delJob=id=>{
   const jobs=Array.isArray(S.classJobs)?S.classJobs:[];
@@ -2468,8 +2867,22 @@ W.delJob=id=>{
   save();refresh();toast("已删除");
 };
 W.runJobPoints=()=>{
-  const n=applyJobPoints();
-  refresh();toast(n?"已计入 "+n+" 条职务加分":"本期职务加分已全部计入");
+  const jobs=Array.isArray(S.classJobs)?S.classJobs:[];
+  const logs=S.points.logs||(S.points.logs=[]);
+  const now=new Date();let n=0;
+  jobs.forEach(j=>{
+    const pts=+j.pts||0;if(!pts)return;
+    const key=jobPeriodKey(j.cycle,now);
+    (j.studentIds||[]).forEach(sid=>{
+      if(!(S.students||[]).some(s=>s.id===sid))return;
+      if(logs.some(l=>l.jobId===j.id&&l.studentId===sid&&l.period===key))return;
+      S.points.scores[sid]=(S.points.scores[sid]||0)+pts;
+      logs.push({id:uid(),studentId:sid,delta:pts,reason:"职务·"+j.name,time:nowStr(),jobId:j.id,period:key});
+      n++;
+    });
+  });
+  if(n)save();
+  refresh();toast(n?("已计入当前周期 "+n+" 条职务加分"):"当前周期职务加分已全部计入");
 };
 
 /* ---- 科任老师 CRUD（信息卡，不参与积分） ---- */
@@ -2551,8 +2964,7 @@ W.doChangeTenure=(kind,id)=>{
     const newIds=Array.from(document.querySelectorAll(".nstu:checked")).map(x=>x.value);
     j.studentIds=newIds;
     save();
-    const n=applyJobPoints();
-    closeModal();refresh();toast("已换届并归档"+curIds.length+" 条历史任职"+(n?"，本次计入 "+n+" 条加分":""));
+    closeModal();refresh();toast("已换届并归档"+curIds.length+" 条历史任职；新任职将在周期末自动计入积分");
   } else if(kind==="teacher"){
     const list=Array.isArray(S.teachers)?S.teachers:[];
     const t=el(id,list);if(!t)return;
@@ -3007,10 +3419,10 @@ W.manageTerms=()=>{
   openModal(`<h3>学期管理</h3>
     <div class="tiny muted" style="margin:-8px 0 10px">归档的学期不出现在积分页的时间选项中；「全部时间」= 所有<b>未归档</b>学期的起止范围。</div>
     ${list}
-    <div class="field row" style="margin-top:12px">
-      <div style="flex:2"><label class="lbl">名称</label><input class="fld" id="t_name" placeholder="如 2026-2027学年第一学期"></div>
-      <div style="flex:1"><label class="lbl">开始</label><input class="fld" type="date" id="t_s"></div>
-      <div style="flex:1"><label class="lbl">结束</label><input class="fld" type="date" id="t_e"></div>
+    <div class="field" style="margin:12px 0 8px"><label class="lbl">名称</label><input class="fld" id="t_name" placeholder="如 2026-2027学年第一学期"></div>
+    <div class="field row" style="align-items:flex-end">
+      <div style="flex:1;min-width:0"><label class="lbl">开始</label><input class="fld" type="date" id="t_s" style="min-width:0"></div>
+      <div style="flex:1;min-width:0"><label class="lbl">结束</label><input class="fld" type="date" id="t_e" style="min-width:0"></div>
     </div>
     <div class="foot"><button class="btn ghost" onclick="W.suggestTerm()" title="按今天所在学期自动填充">按今天填充</button><span style="flex:1"></span><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.addTerm()">添加学期</button></div>`);
 };
@@ -3060,7 +3472,7 @@ W.setManual=(id,t)=>{
 
 W.seatIO=k=>{
   openModal(`<h3>${k==="import"?"导入":"导出"}</h3>
-  <div class="tiny muted" style="margin-bottom:10px">选择要${k==="import"?"导入":"导出"}的内容</div>
+  <div class="tiny muted" style="margin-bottom:10px">选择要${k==="import"?"导入":"导出"}的内容（均为 CSV 文件）</div>
   <div style="display:flex;flex-direction:column;gap:8px">
     <button class="btn" style="width:100%" onclick="W.${k}Zones()">座位等级排位（ABC 区域 + 固定）</button>
     <button class="btn ghost" style="width:100%" onclick="W.${k}Tiers()">学生等级（名单）</button>
@@ -3069,37 +3481,39 @@ W.seatIO=k=>{
 };
 const zoneText=()=>{
   const cfg=S.seatCfg;
+  const zones=S.seatZones||[],fixed=S.seatFixed||[];
   const nRows=cfg.rows+(cfg.row0?1:0);
-  const cell=i=>{const z=S.seatZones[i];let s=z||"-";if(S.seatFixed[i])s+="!";return s;};
-  const lines=["R"+nRows+" C"+cfg.cols];
-  for(let r=0;r<nRows;r++){const row=[];for(let c=0;c<cfg.cols;c++)row.push(cell(r*cfg.cols+c));lines.push(row.join(" "));}
+  const cell=i=>{const z=zones[i];let s=z||"-";if(fixed[i])s+="!";return s;};
+  const lines=["R"+nRows+",C"+cfg.cols];
+  for(let r=0;r<nRows;r++){const row=[];for(let c=0;c<cfg.cols;c++)row.push(cell(r*cfg.cols+c));lines.push(row.join(","));}
   return lines.join("\n");
 };
 W.exportZones=()=>{
   openModal(`<h3>导出座位等级排位</h3>
   <div class="tiny muted" style="margin-bottom:6px">首行为尺寸（R排 C列），A/B/C 为区域，! 为固定座。</div>
   <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre">${esc(zoneText())}</textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('座位等级排位')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
 };
 W.copyIO=()=>{const t=$("#m_io");t.focus();t.select();let done=false;try{done=document.execCommand("copy");}catch(e){}
   if(!done&&navigator.clipboard){navigator.clipboard.writeText(t.value).then(()=>toast("已复制")).catch(()=>toast("请手动复制"));return;}
   toast(done?"已复制":"请手动复制");};
 W.importZones=()=>{
   openModal(`<h3>导入座位等级排位</h3>
-  <div class="tiny muted" style="margin-bottom:6px">粘贴导出的文本（含 R… C… 首行）。尺寸一致则保留现有座位安排，不一致会清空重排。</div>
-  <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre" placeholder="R6 C7&#10;- - A A - - -&#10;..."></textarea>
+  <div class="tiny muted" style="margin-bottom:10px">选择之前导出的 CSV 文件（首行 R… C…，A/B/C 为区域，! 为固定座）。尺寸一致则保留现有座位安排，不一致会清空重排。</div>
+  <div class="field"><label class="lbl">选择 CSV 文件</label><input class="fld" type="file" id="m_file" accept=".csv,text/csv"></div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applyZones()">导入</button></div>`);
 };
-W.applyZones=()=>{
-  const lines=($("#m_io").value||"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  const head=lines.length?lines[0].match(/^R(\d+)\s+C(\d+)$/i):null;
-  if(!head){toast("格式无法识别（缺 R… C… 首行）");return;}
+/* 解析座位等级排位文本（兼容逗号 / 空格分隔）并写入；返回 {ok,msg}（纯函数） */
+function applySeatZoneText(txt){
+  const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const head=lines.length?lines[0].replace(/\s*,\s*/g," ").match(/^R(\d+)\s+C(\d+)$/i):null;
+  if(!head)return {ok:false,msg:"格式无法识别（缺 R… C… 首行）"};
   const rows=+head[1],cols=+head[2];
-  if(rows<1||rows>12||cols<1||cols>12||lines.length<rows+1){toast("行列数超出范围或行数不足");return;}
+  if(rows<1||rows>12||cols<1||cols>12||lines.length<rows+1)return {ok:false,msg:"行列数超出范围或行数不足"};
   const zones=[],fixed=[];
   for(let r=0;r<rows;r++){
-    const cells=lines[r+1].split(/\s+/);
-    if(cells.length<cols){toast("第 "+(r+1)+" 行列数不足");return;}
+    const cells=lines[r+1].split(/[\s,]+/).filter(x=>x!=="");
+    if(cells.length<cols)return {ok:false,msg:"第 "+(r+1)+" 行列数不足"};
     for(let c=0;c<cols;c++){
       const t=cells[c].toUpperCase();const f=t.endsWith("!");
       const z=t.replace(/!+$/,"");
@@ -3119,26 +3533,39 @@ W.applyZones=()=>{
    else if(_used<cols){_bg[_bg.length-1]=(_bg[_bg.length-1]||0)+(cols-_used);S.seatCfg.bigGroups=_bg;}}
   S.seatZones=zones;S.seatFixed=fixed;
   if(!same)S.seating=new Array((S.seatCfg.rows+(r0?1:0))*cols).fill(null);
-  save();closeModal();
-  if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
-  toast("已导入座位等级排位"+(same?"":"（尺寸变化，座位安排已清空）"));
+  return {ok:true,same:same};
+}
+W.applyZones=()=>{
+  readTextFile("m_file",(text,err)=>{
+    if(err){toast(err);return;}
+    const r=applySeatZoneText(text);
+    if(!r.ok){toast(r.msg);return;}
+    save();closeModal();
+    if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
+    toast("已导入座位等级排位"+(r.same?"":"（尺寸变化，座位安排已清空）"));
+  });
 };
 W.exportTiers=()=>{
   const text="姓名,等级\n"+S.students.map(s=>esc(s.name)+","+(s.tier||"")).join("\n");
   openModal(`<h3>导出学生等级</h3>
   <div class="tiny muted" style="margin-bottom:6px">导出手动设定的等级（每行「姓名,等级」，空为按计算）；计算等级可由成绩/积分/身高数据随时重算。</div>
   <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre">${text}</textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('学生等级')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
 };
 W.importTiers=()=>{
-  openModal(`<h3>导入学生等级</h3>
-  <div class="tiny muted" style="margin-bottom:6px">每行「姓名,等级」，按姓名匹配并写入手动设定等级（凌驾计算）；未找到的跳过。</div>
-  <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre" placeholder="张明,A&#10;李婷,B"></textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applyTiers()">导入</button></div>`);
+  /* 点击即弹出系统文件选择窗口 */
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    if(!String(text||"").trim()){toast("内容为空");return;}
+    const r=applyTierText(text);
+    save();closeModal();
+    if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
+    toast("已更新 "+r.done+" 人等级"+(r.miss?"，"+r.miss+" 行未匹配":""));
+  }));
 };
-W.applyTiers=()=>{
-  const lines=($("#m_io").value||"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(!lines.length){toast("内容为空");return;}
+/* 解析「姓名,等级」文本并写入手动等级；返回 {done,miss}（纯函数） */
+function applyTierText(txt){
+  const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   let done=0,miss=0;
   lines.forEach(l=>{
     if(/^姓名\s*,/.test(l))return;
@@ -3148,10 +3575,8 @@ W.applyTiers=()=>{
     if(!s){miss++;return;}
     s.tier=["A","B","C"].includes(t)?t:"";done++;
   });
-  save();closeModal();
-  if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
-  toast("已更新 "+done+" 人等级"+(miss?"，"+miss+" 行未匹配":""));
-};
+  return {done,miss};
+}
 W.dragStart=(e,i)=>{e.dataTransfer.setData("text",i);};
 W.dropSeat=(e,i)=>{ensureSeat();const raw=e.dataTransfer.getData("text");if(String(raw).startsWith("SG:"))return;/* 组名拖拽落到座位上：忽略 */const from=+raw;if(Number.isNaN(from))return;if(S.seatFixed[i]){toast("目标座位已固定");return;}if(S.seatFixed[from]){toast("该学生座位已固定");return;}const t=S.seating[i];S.seating[i]=S.seating[from];S.seating[from]=t;W.syncStudyGroups();save();viewSeating(document.getElementById("view"));};
 /* ============ 拖动学习组名整体换座 ============ */
@@ -3329,12 +3754,90 @@ W.toggleLotRepeat=on=>{
   toast(on?"已开启：同一个人可以被重复抽中":"已关闭：每人本轮只抽一次");
 };
 W.resetLottery=()=>{S.lottery.drawn=[];save();viewLottery(document.getElementById("view"));};
+/* ---- 惩罚抽取：先确定学生，再随机抽一条惩罚 ---- */
+W.drawPun=()=>{
+  if(punRollTimer)return; /* 正在滚动：忽略重复触发，避免并发入账 */
+  const puns=lotPuns();
+  if(!puns.length){toast("请先添加惩罚（点「管理惩罚」）");return;}
+  const sel=document.getElementById("punStu");
+  const sid=sel?sel.value:"";
+  if(!sid){toast("请先选择学生");return;}
+  const sname=studentName(sid);
+  const stage=$("#punStage"),btn=$("#punBtn");if(!stage)return;
+  if(btn)btn.disabled=true;stage.classList.add("roll");
+  let ticks=0;const max=24;
+  punRollTimer=setInterval(()=>{
+    const p=puns[Math.floor(Math.random()*puns.length)];
+    stage.innerHTML=`<span class="lbl">${esc(sname)} · 抽取中…</span>${esc(p.name)}`;
+    ticks++;
+    if(ticks>=max){
+      clearInterval(punRollTimer);punRollTimer=null;
+      const pick=puns[Math.floor(Math.random()*puns.length)];
+      const time=nowStr();
+      /* 学生先确定下来，只有惩罚是随机抽的；学生名一并快照，防止日后改名/删除导致记录读到空 */
+      lotPunLogs().push({id:uid(),studentId:sid,stuName:sname,punId:pick.id,name:pick.name,time:time});
+      save();
+      stage.classList.remove("roll");
+      /* 抽中的惩罚留在舞台上，直到下一次抽取或重新进入本页 */
+      stage.innerHTML=`<span class="lbl">本次惩罚 · ${esc(sname)} · ${esc(time)}</span>${esc(pick.name)}`;
+      refreshPunLists();
+      if(btn)btn.disabled=!(lotPuns().length&&S.students.length);
+    }
+  },60);
+};
+/* ---- 管理惩罚（自定义增删改） ---- */
+W.managePuns=()=>{
+  const puns=lotPuns();
+  const rows=puns.map(p=>`<div class="row" style="gap:6px;margin-bottom:6px">
+      <input class="fld h30" style="flex:1;min-width:0" value="${esc(p.name)}" onchange="W.punRename('${p.id}',this.value)">
+      <button class="btn ghost sm h30" style="flex:none" onclick="W.punDel('${p.id}')">删除</button>
+    </div>`).join("")||`<div class="empty">还没有惩罚，在下方添加</div>`;
+  openModal(`<h3>管理惩罚</h3>
+    <div class="tiny muted" style="margin:2px 0 10px">惩罚抽取会从下面的列表里随机抽一条，可随时改名、删除或新增。</div>
+    <div style="max-height:46vh;overflow:auto">${rows}</div>
+    <div class="field" style="margin-top:12px"><label class="lbl">新增惩罚</label>
+      <div class="row" style="gap:6px">
+        <input class="fld h30" style="flex:1;min-width:0" id="m_pun_new" placeholder="如：罚抄课文 1 遍">
+        <button class="btn sm h30" style="flex:none" onclick="W.punAdd()">添加</button>
+      </div></div>
+    <div class="foot"><button class="btn" onclick="W.punClose()">完成</button></div>`);
+};
+W.punAdd=()=>{
+  const inp=document.getElementById("m_pun_new");if(!inp)return;
+  const n=(inp.value||"").trim();
+  if(!n){toast("请填写惩罚内容");return;}
+  const puns=lotPuns();
+  if(puns.some(p=>p.name===n)){toast("已有同名惩罚");return;}
+  puns.push({id:uid(),name:n});
+  save();W.managePuns();
+};
+W.punRename=(id,val)=>{
+  const p=lotPuns().find(x=>x.id===id);if(!p)return;
+  const n=(val||"").trim();
+  if(!n){toast("名称不能为空");W.managePuns();return;}
+  p.name=n;save();W.managePuns();
+};
+W.punDel=id=>{
+  if(!confirm("删除这条惩罚？已抽取的惩罚记录会保留。"))return;
+  const cfg=S.lottery;cfg.puns=lotPuns().filter(x=>x.id!==id);
+  save();W.managePuns();
+};
+W.punClose=()=>{closeModal();viewLottery(document.getElementById("view"));};
+/* 惩罚记录：勾选 = 该次惩罚已执行完成（不勾选即未完成） */
+W.togglePunDone=id=>{
+  const l=lotPunLogs().find(x=>x.id===id);if(!l)return;
+  l.done=!l.done;save();refreshPunLists();
+};
+W.clearPunLogs=()=>{
+  if(!confirm("清空全部惩罚记录？"))return;
+  S.lottery.punLogs=[];save();viewLottery(document.getElementById("view"));
+};
 W.editCell=(d,p)=>{const c=S.schedule.cells[d+"-"+p]||{};const pl=periodLabel(p);
   openModal(`<h3>${esc(pl)} · ${DAYS.find(x=>x[0]===d)[1]}</h3>
-  <div class="field row"><div style="flex:1"><label class="lbl">科目</label><input class="fld" id="m_cs" value="${esc(c.sub||"")}"></div>
-    <div style="flex:1"><label class="lbl">班级</label><input class="fld" id="m_cc" value="${esc(c.cls||"")}"></div></div>
-  <div class="field row"><div style="flex:1"><label class="lbl">授课老师</label><input class="fld" id="m_ct" value="${esc(c.tch||"")}"></div>
-    <div style="flex:1"><label class="lbl">联系方式</label><input class="fld" id="m_cn" value="${esc(c.tel||"")}"></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">科目</label><input class="fld" id="m_cs" value="${esc(c.sub||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">班级</label><input class="fld" id="m_cc" value="${esc(c.cls||"")}"></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">授课老师</label><input class="fld" id="m_ct" value="${esc(c.tch||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">联系方式</label><input class="fld" id="m_cn" value="${esc(c.tel||"")}"></div></div>
   ${timeFields("m_c1","m_c2",periodTime(p))}
   <div class="tiny muted">上课时间按节次统一保存，改一次即应用到这一天的同一节次。</div>
   <div class="foot"><button class="btn danger ghost" onclick="W.clearCell('${d}','${p}')">清除</button><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveCell('${d}','${p}')">保存</button></div>`);};
@@ -3432,12 +3935,12 @@ function periodOptions(sel){
 }
 W.addSchedule=()=>{
   openModal(`<h3>添加课程</h3>
-  <div class="field row"><div style="flex:1"><label class="lbl">星期</label><select class="fld" id="m_sd">${DAYS.map(d=>`<option value="${d[0]}">${d[1]}</option>`).join("")}</select></div>
-    <div style="flex:1"><label class="lbl">节次</label><select class="fld" id="m_sp">${periodOptions(1)}</select></div></div>
-  <div class="field row"><div style="flex:1"><label class="lbl">科目 *</label><input class="fld" id="m_ss"></div>
-    <div style="flex:1"><label class="lbl">班级</label><input class="fld" id="m_sc"></div></div>
-  <div class="field row"><div style="flex:1"><label class="lbl">授课老师</label><input class="fld" id="m_st"></div>
-    <div style="flex:1"><label class="lbl">联系方式</label><input class="fld" id="m_sn"></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">星期</label><select class="fld" id="m_sd">${DAYS.map(d=>`<option value="${d[0]}">${d[1]}</option>`).join("")}</select></div>
+    <div style="flex:1;min-width:0"><label class="lbl">节次</label><select class="fld" id="m_sp">${periodOptions(1)}</select></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">科目 *</label><input class="fld" id="m_ss"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">班级</label><input class="fld" id="m_sc"></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">授课老师</label><input class="fld" id="m_st"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">联系方式</label><input class="fld" id="m_sn"></div></div>
   ${timeFields("m_s1","m_s2",periodTime(1))}
   <div class="tiny muted">已占用的格子会被覆盖；也可以直接点课表格子填写。上课时间按节次统一保存。</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doAddSchedule()">保存</button></div>`);
@@ -3456,14 +3959,19 @@ W.exportSchedule=()=>{
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn ghost" onclick="W.downloadIO('课表')">下载 CSV</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
 };
 W.importSchedule=()=>{
-  openModal(`<h3>导入课表</h3>
-  <div class="tiny muted" style="margin-bottom:6px">粘贴「星期,节次,上课时间,科目,班级,授课老师,联系方式」文本（可含表头）。按星期+节次覆盖写入，节次超出当前节数会自动扩展；上课时间列可省略。</div>
-  <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre" placeholder="周一,1,08:00-08:45,语文,一班,张老师,13800138000"></textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applySchedule()">导入</button></div>`);
+  /* 点击即弹出系统文件选择窗口 */
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    const r=applySchedText(text);
+    if(r.empty){toast("内容为空");return;}
+    save();viewSchedule(document.getElementById("view"));
+    toast("已导入 "+r.n+" 节课"+(r.bad?"，跳过 "+r.bad+" 行":""));
+  }));
 };
-W.applySchedule=()=>{
-  const lines=($("#m_io").value||"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(!lines.length){toast("内容为空");return;}
+/* 解析课表 CSV 文本并写入 S.schedule；返回 {n,bad,empty}（纯函数，便于复用与测试） */
+function applySchedText(txt){
+  const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return {n:0,bad:0,empty:true};
   let n=0,bad=0;
   lines.forEach(l=>{
     if(/^星期\s*,/.test(l))return;
@@ -3488,12 +3996,41 @@ W.applySchedule=()=>{
     if(tm){const x=tm.split(/\s*[-–~至]\s*/);setPeriodTime(p,{s:x[0]||"",e:x[1]||""});}
     n++;
   });
-  save();closeModal();viewSchedule(document.getElementById("view"));
-  toast("已导入 "+n+" 节课"+(bad?"，跳过 "+bad+" 行":""));
-};
+  return {n,bad};
+}
 function downloadCSV(name,csv){
   const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name+".csv";a.click();toast("已下载 CSV");
+}
+/* 读取 <input type=file> 选中的文本文件（UTF-8），回调 cb(text, errMsg) */
+function readTextFile(inputId,cb){
+  const inp=document.getElementById(inputId);
+  const f=inp&&inp.files&&inp.files[0];
+  if(!f){cb(null,"请选择文件");return;}
+  readFileAsText(f,cb);
+}
+/* 读取 File 为 UTF-8 文本，回调 cb(text, errMsg) */
+function readFileAsText(f,cb){
+  const rd=new FileReader();
+  rd.onload=()=>cb(String(rd.result||""),null);
+  rd.onerror=()=>cb(null,"文件读取失败");
+  rd.readAsText(f,"UTF-8");
+}
+/* 点击即弹出系统文件选择窗口（无需先开弹窗）：accept 形如 ".csv,text/csv"；选中后回调 cb(file) */
+function pickFile(accept,cb){
+  const inp=document.createElement("input");
+  inp.type="file";inp.accept=accept||"";inp.style.position="fixed";inp.style.left="-9999px";
+  document.body.appendChild(inp);
+  inp.onchange=()=>{
+    const f=inp.files&&inp.files[0];
+    if(inp.parentNode)inp.parentNode.removeChild(inp);
+    if(f)cb(f);
+  };
+  inp.click();
+}
+function downloadJSON(name,obj){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name+".json";a.click();toast("已下载 JSON");
 }
 W.downloadIO=name=>{const t=$("#m_io");if(!t||!t.value.trim()){toast("没有内容");return;}downloadCSV(name,t.value);};
 /* ---- 名册导出 ---- */
@@ -3518,18 +4055,28 @@ W.exportRoster=()=>{
 W.importGrades=id=>{
   if(!S.exams.length){toast("先添加考试");return;}
   openModal(`<h3>导入成绩</h3>
-  <div class="field"><label class="lbl">导入到考试</label><select class="fld" id="m_ge">${S.exams.map(e=>`<option value="${e.id}" ${e.id===id?"selected":""}>${esc(e.name)}</option>`).join("")}</select></div>
-  <div class="field"><label class="lbl">成绩文本（CSV）</label><textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre" placeholder="姓名,语文,数学,英语&#10;张明,92,88,95"></textarea></div>
-  <div class="tiny muted">首行为科目表头（首列姓名），按姓名匹配学生；新科目会自动加入该考试，未找到的学生跳过。</div>
+  <div class="field row"><label class="lbl" style="margin:0;flex:none">导入到考试</label><select class="fld" id="m_ge">${S.exams.map(e=>`<option value="${e.id}" ${e.id===id?"selected":""}>${esc(e.name)}</option>`).join("")}</select></div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applyGrades()">导入</button></div>`);
 };
 W.applyGrades=()=>{
   const ex=el($("#m_ge").value,S.exams);if(!ex){toast("考试不存在");return;}
-  const lines=($("#m_io").value||"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  if(lines.length<2){toast("至少需要表头和一行数据");return;}
+  /* 点「导入」直接弹出系统文件选择窗口（CSV：首行科目表头，首列姓名） */
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    const r=applyGradeText(ex,text);
+    if(!r.ok){toast(r.msg);return;}
+    save();closeModal();viewGrades(document.getElementById("view"));
+    toast("已导入 "+r.n+" 人×"+r.subs+" 科"+(r.miss?"，未找到 "+r.miss+" 人":"")+(r.cnt?"；已自动记录 "+r.cnt+" 条加减分":""));
+  }));
+};
+/* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数） */
+function applyGradeText(ex,text){
+  if(!ex)return {ok:false,msg:"考试不存在"};
+  const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(lines.length<2)return {ok:false,msg:"至少需要表头和一行数据"};
   const head=lines[0].split(/[,，]/).map(x=>x.trim());
   const subs=head.slice(1).filter(Boolean);
-  if(!subs.length){toast("表头缺少科目");return;}
+  if(!subs.length)return {ok:false,msg:"表头缺少科目"};
   subs.forEach(s=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
   let n=0,miss=0;
   for(let i=1;i<lines.length;i++){
@@ -3540,9 +4087,9 @@ W.applyGrades=()=>{
     subs.forEach((sub,k)=>{const v=c[k+1];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
     n++;
   }
-  save();closeModal();viewGrades(document.getElementById("view"));
-  toast("已导入 "+n+" 人×"+subs.length+" 科"+(miss?"，未找到 "+miss+" 人":""));
-};
+  const cnt=applyGradeRules(ex);/* 按成绩规则自动录入加减分记录（幂等，重复导入会覆盖） */
+  return {ok:true,n,miss,subs:subs.length,cnt};
+}
 function nowStr(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());}
 /* 供 datetime-local 输入：YYYY-MM-DDTHH:MM */
 function nowLocal(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
@@ -3666,13 +4213,42 @@ function cloudDisconnect(){
   openModal(dataModalHtml());toast("已断开云端同步");
 }
 
-/* data panel */
-function dataModalHtml(){
+/* ---- 全部导出 / 全部导入：整份数据（名册·成绩·行为·积分·兑换·抽签·事务等）备份与还原 ---- */
+W.exportAll=()=>{
+  const d=new Date(),p=n=>String(n).padStart(2,"0");
+  const stamp=d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+  downloadJSON("工作台数据-"+stamp,S);
+};
+W.importAll=()=>{
+  openModal(`<h3>全部导入</h3>
+    <div class="tiny muted" style="margin-bottom:10px">选择之前「全部导出」的 JSON 文件。导入将<b>覆盖当前全部数据</b>（名册、成绩、行为、积分、兑换、抽签、事务等）。</div>
+    <div class="field"><label class="lbl">选择 JSON 文件</label><input type="file" id="m_allf" accept=".json,application/json" class="fld"></div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn danger" onclick="W.doImportAll()">覆盖导入</button></div>`);
+};
+W.doImportAll=()=>{
+  const f=$("#m_allf").files[0];if(!f){toast("请选择文件");return;}
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const obj=JSON.parse(rd.result);
+      if(!obj||typeof obj!=="object"||Array.isArray(obj)){toast("文件格式不正确");return;}
+      S=Object.assign(def(),obj);
+      if(!S.mig)S.mig={};
+      save();closeModal();route();toast("已导入全部数据");
+    }catch(e){toast("解析失败：文件不是有效 JSON");}
+  };
+  rd.readAsText(f);
+};
+
+/* data panel：同一份内容同时供弹窗与「数据」页使用 */
+function dataPanelHtml(){
   const c=cloudCfg();
-  return `<h3>数据管理</h3>
-    <div class="tiny muted" style="margin-bottom:12px">数据默认保存在当前浏览器（localStorage），刷新不丢。开启下方「云端同步」后，多台设备共用同一份数据。</div>
-    <div class="field"><button class="btn ghost" style="width:100%;justify-content:center" onclick="demo();closeModal();refresh();toast('已载入示例数据')">载入示例数据</button></div>
-    <div class="field"><button class="btn danger" style="width:100%" onclick="clearAllAsk()">清空全部数据</button></div>
+  return `<div class="row" style="gap:8px;margin-bottom:12px">
+      <button class="btn ghost h30" style="flex:1;min-width:0;justify-content:center" onclick="demo();closeModal();refresh();toast('已载入示例数据')">示例</button>
+      <button class="btn danger h30" style="flex:1;min-width:0;justify-content:center" onclick="clearAllAsk()">清空</button>
+      <button class="btn ghost h30" style="flex:1;min-width:0;justify-content:center" onclick="W.importAll()">全部导入</button>
+      <button class="btn ghost h30" style="flex:1;min-width:0;justify-content:center" onclick="W.exportAll()">全部导出</button>
+    </div>
     <div style="border-top:1px solid var(--line);margin:16px 0 12px"></div>
     <div style="font-weight:600;margin-bottom:6px">云端同步</div>
     <div class="tiny muted" style="margin-bottom:10px">程序放在<b>公开</b>仓库供网页访问；数据只写入你的<b>私有</b>仓库，别人看不到。</div>
@@ -3686,25 +4262,68 @@ function dataModalHtml(){
       <div class="field" style="flex:1;margin-bottom:0"><label class="lbl">分支</label><input class="fld" id="cloud_branch" placeholder="main" value="${esc(c.branch||"main")}" onchange="cloudCfgSet('branch',this.value)"></div>
       <div class="field" style="flex:2;margin-bottom:0"><label class="lbl">文件路径</label><input class="fld" id="cloud_path" placeholder="data.json" value="${esc(c.path||"data.json")}" onchange="cloudCfgSet('path',this.value)"></div>
     </div>
-    <div class="row" style="gap:8px;margin-bottom:8px">
-      <button class="btn ghost sm" onclick="cloudTest()">测试连接</button>
-      <button class="btn sm" onclick="cloudSyncNow()">立即同步</button>
-      <button class="btn ghost sm" onclick="cloudDisconnect()">断开</button>
+    <div class="row wrap" style="gap:8px;margin-bottom:8px">
+      <button class="btn ghost sm h30" onclick="cloudTest()">测试连接</button>
+      <button class="btn sm h30" onclick="cloudSyncNow()">立即同步</button>
+      <button class="btn ghost sm h30" onclick="cloudDisconnect()">断开</button>
     </div>
-    <div class="tiny" id="cloud_st" style="min-height:18px"></div>
-    <div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`;
+    <div class="tiny" id="cloud_st" style="min-height:18px"></div>`;
+}
+function dataModalHtml(){
+  return `<h3>数据管理</h3>`+dataPanelHtml()+`<div class="foot"><button class="btn" onclick="closeModal()">关闭</button></div>`;
 }
 function openData(){openModal(dataModalHtml());}
+/* 「数据」页（导航项）：与弹窗同一份内容，整页呈现 */
+function viewData(v){
+  v.innerHTML=`<div class="card pad">${dataPanelHtml()}</div>`;
+  const st=document.getElementById("cloud_st");
+  if(st)cloudStatus(cloudCfg().enabled?"ok":"","已达成本地保存"+(cloudCfg().enabled?"，云端同步已启用":"；开启「云端同步」可多设备共用"));
+}
 
 /* ============ init ============ */
 function applyTheme(){document.documentElement.setAttribute("data-theme",S.theme);$("#themeBtn").textContent=S.theme==="dark"?"☀️":"🌙";$("#themeTx").textContent=S.theme==="dark"?"浅色":"深色";}
 function toggleTheme(){S.theme=S.theme==="dark"?"light":"dark";save();applyTheme();}
+/* 迁移：旧版兑换直接扣了 S.points.scores 并写了一条负积分日志（带 rdmId）。
+   新模型「积分」不可被兑换改动，故这里把旧兑换的消耗还给积分，并清掉那些负日志，
+   兑换消耗改由 S.redeem.logs 统计为「可兑换积分」。一次执行。 */
+function migrateRedeemV2(){
+  if(!S.mig)S.mig={};
+  if(S.mig.redeemV2)return;
+  const R=ensureRedeem();
+  let changed=false;
+  if(R.logs&&R.logs.length){
+    const spent={};
+    R.logs.forEach(l=>{const c=(l.type==='eliminate'?((+l.qty||0)?(+l.cost||0)*(+l.qty||1):(+l.cost||0)):(+l.cost||0)*(+l.qty||1));if(c)spent[l.studentId]=(spent[l.studentId]||0)+c;});
+    Object.keys(spent).forEach(sid=>{S.points.scores[sid]=(S.points.scores[sid]||0)+spent[sid];changed=true;});
+    const before=(S.points.logs||[]).length;
+    S.points.logs=(S.points.logs||[]).filter(l=>!l.rdmId);
+    if((S.points.logs||[]).length!==before)changed=true;
+  }
+  S.mig.redeemV2=true;
+  if(changed)save();
+}
+/* 迁移 V3：新模型把「消除扣分」从「消耗可兑换」改为「恢复可兑换」。
+   旧模型迁移时曾把消除额度一并加回积分（消除本不动积分），这里对已迁移过的数据
+   把那部分消除额度扣回，使积分回到原始行为分；新数据（未跑过 V2）不受影响。 */
+function migrateRedeemV3(){
+  if(!S.mig)S.mig={};
+  if(S.mig.redeemV3)return;
+  if(S.mig.redeemV2){
+    const R=ensureRedeem();const el={};
+    (R.logs||[]).forEach(l=>{ if(l.type==='eliminate'){ const c=((+l.qty||0)?(+l.cost||0)*(+l.qty||1):(+l.cost||0)); if(c)el[l.studentId]=(el[l.studentId]||0)+c; }});
+    Object.keys(el).forEach(sid=>{ S.points.scores[sid]=(S.points.scores[sid]||0)-el[sid]; });
+    save();
+  }
+  S.mig.redeemV3=true;
+}
 function init(){
   if(!S.students.length && !S.exams.length && !S.todos.length) demo();
+  migrateRedeemV2();
+  migrateRedeemV3();
   buildNav();applyTheme();
-  applyJobPoints();/* 班级工作：按周期自动计入职务加分（幂等，同一周期不重复） */
+  runJobAuto();/* 班级工作：周期末自动计入职务加分（幂等，不立即算分） */
+  setInterval(()=>{runJobAuto();},60000);/* 页面开着时每 60 秒检查，命中周期末即自动记 */
   $("#themeBtn").onclick=toggleTheme;
-  $("#dataBtn").onclick=openData;
   $("#moreBtn")&&($("#moreBtn").onclick=e=>{e.preventDefault();$("#moreDrawer").classList.toggle("show");});
   $("#moreDrawer").onclick=e=>{if(e.target.id==="moreDrawer")$("#moreDrawer").classList.remove("show");};
   $("#mask").onclick=e=>{if(e.target.id==="mask")closeModal();};
