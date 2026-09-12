@@ -840,10 +840,10 @@ function computeTiers(){
     selExams.forEach(e=>{
       const sc=e.scores[s.id]||{};
       if(cfg.gradeRange==="all"){
-        /* 全部考试：每次考试取各科原始分总分，再对总分求平均（科目占比不参与） */
+        /* 全部考试：每次考试取各科原始分的平均分，再对平均分求平均（科目占比不参与，量纲与单/数次一致，避免总分飙到几百） */
         let sum=0,cnt=0;
         e.subjects.forEach(sub=>{const v=parseFloat(sc[sub]);if(v!==undefined&&!isNaN(v)){sum+=v;cnt++;}});
-        if(cnt>0)gs.push(sum);
+        if(cnt>0)gs.push(sum/cnt);
       }else{
         /* 最近1/2/3次：按科目占比加权平均 */
         let ws=0,wscore=0;
@@ -1977,7 +1977,7 @@ function viewTiers(v){
     <summary style="cursor:pointer;font-weight:700;font-size:14px">计算规则说明</summary>
     <div class="tiny muted" style="line-height:1.9;margin-top:8px">
       1. 总分 = 成绩 × ${S.tierCfg.gw}% + 积分 × ${S.tierCfg.pw}% − 身高 × ${S.tierCfg.hw}%（身高为减项，越矮总分越高；上方权重可随时调整）<br>
-      2. 成绩：选最近 1/2/3 次时，各次考试按科目占比加权平均（默认语、数、英、物各占 20%，生、地各占 10%，政、史不计占比，占比可在上方修改）；选「全部考试」时，取每次考试各科<b>原始分总分</b>，再对总分求平均（科目占比不参与）；某次未录成绩则该次跳过，范围内全无成绩按 0 分计<br>
+      2. 成绩：选最近 1/2/3 次时，各次考试按科目占比加权平均（默认语、数、英、物各占 20%，生、地各占 10%，政、史不计占比，占比可在上方修改）；选「全部考试」时，取每次考试各科<b>原始分的平均分</b>，再对平均分求平均（科目占比不参与，量纲与最近1/2/3次一致）；某次未录成绩则该次跳过，范围内全无成绩按 0 分计<br>
       3. 积分取所选时间范围（最近7天/最近30天/全部）内的加减分合计，全部即当前累计分；积分、身高按全班「最低—最高」线性折算为 0—100 分再计入；未录身高按 50 计<br>
       4. 按总分排名：前 1/3 为 A 等，中间 1/3 为 B 等，后 1/3 为 C 等<br>
       5. 手动设定凌驾于计算规则：如计算为 B 等但手动设为 C 等，最终为 C 等；列表中会标注「计算 B 等，设为 C 等」
