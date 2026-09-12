@@ -397,13 +397,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
 
 /* schedule */
 .sched-scroll{overflow-x:auto}
-.sched{display:grid;grid-template-columns:max-content repeat(5,max-content);gap:6px;justify-content:start}
+.sched{display:grid;grid-template-columns:max-content repeat(5,minmax(0,1fr));gap:6px}
 .sched-head,.sched-row{display:contents}
 .sched .p{display:grid;place-items:center;align-content:center;gap:1px;font-size:12px;color:var(--ink-2);font-weight:600;min-width:0;text-align:center;padding:0 2px;position:sticky;left:0;z-index:2;background:var(--panel)}
 .sched .p>span{white-space:nowrap}
 .sched .p .p-t{font-size:10px;color:var(--ink-3);font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap}
 .sched .p.today{color:var(--brand-ink);background:color-mix(in srgb,var(--brand) 8%,var(--panel));border-radius:8px}
-.sched .cell{position:relative;min-height:46px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:9px;background:var(--panel);padding:6px 8px;font-size:12px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.sched .cell{position:relative;min-height:46px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:9px;background:var(--panel);padding:6px 8px;font-size:12px;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden}
 .sched .cell.today{background:var(--brand-soft)}
 .sched .cell .sub{font-weight:700;font-size:12.5px;white-space:nowrap;align-self:center}
 .sched .cell .tch{color:var(--ink-2);font-size:11px;white-space:nowrap;align-self:center}
@@ -491,6 +491,8 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .st-tag{min-height:52px;font-size:10px}
   .tbl-scroll{max-height:none;-webkit-overflow-scrolling:touch}
   .sched-scroll{-webkit-overflow-scrolling:touch}
+  /* 手机端：周一~周五列等宽且给定最小宽度，内容多时仍可在 .sched-scroll 内横滑 */
+  .sched{grid-template-columns:max-content repeat(5,minmax(88px,1fr))}
   /* 手机端隐藏所有滚动条（内容仍可滚动） */
   *{scrollbar-width:none}
   *::-webkit-scrollbar{display:none}
@@ -568,6 +570,20 @@ const DEFAULT_PUNS=()=>[
   {id:"pn5",name:"值日一天"}
 ];
 function behColor(c){return c==='bad'?'var(--bad)':c==='ok'?'var(--ok)':c==='warn'?'var(--warn)':'var(--brand)';}
+/* 行为类别颜色：按类别名固定取色，确保默认类别互不相同；自定义类别按名称散列到调色板。
+   同一类别的「记录前圆圈」与「标签」使用同一颜色，避免视觉错乱。 */
+const BEH_TYPE_COLOR_MAP={
+  "违纪":"#e15759","作业优秀":"#4e79a7","作业未交":"#d98a00","作业差":"#9c755f",
+  "表扬":"#1f9d6b","答题":"#0ea5e9","请假":"#8e44ad","其他":"#7f8c8d","成绩":"#4f5bd5"
+};
+const BEH_TYPE_PALETTE=["#e15759","#4e79a7","#59a14f","#f28e2b","#b07aa1","#16a085","#f1c40f","#9c755f","#e84393","#0ea5e9","#8e44ad","#7f8c8d"];
+function typeColor(k){
+  const t=String(k||"").trim();
+  if(BEH_TYPE_COLOR_MAP[t])return BEH_TYPE_COLOR_MAP[t];
+  let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))>>>0;
+  return BEH_TYPE_PALETTE[h%BEH_TYPE_PALETTE.length];
+}
+function typeSoft(k){return `color-mix(in srgb, ${typeColor(k)} 12%, var(--panel))`;}
 const uid=()=>Math.random().toString(36).slice(2,9);
 function def(){
   return {students:[],exams:[],todos:[],behaviors:[],seatCfg:{rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],row0Merge:{},tagSide:"left",leaders:{}},seating:null,seatZones:null,seatFixed:null,
@@ -855,7 +871,9 @@ function refresh(){route();}
 
 /* ============ router ============ */
 const routes={
-  home:viewHome, roster:viewRoster, grades:viewGrades, todos:viewTasks, behavior:viewBehavior,
+  home:viewHome, roster:viewRoster,
+  grades:v=>{trendSub=null;trendMark=null;viewGrades(v);},/* 进入成绩管理页默认显示全部科目；图例点选仅会话内生效 */
+  todos:viewTasks, behavior:viewBehavior,
   seating:viewSeating, tiers:viewTiers, points:viewPoints, lottery:viewLottery, schedule:viewSchedule,
   jobs:viewJobs, behtypes:viewBehTypes, data:viewData
 };
@@ -925,17 +943,25 @@ function viewHome(v){
   </div>
   <div class="card pad recent" style="margin-top:14px">
     <div class="section-title">最近记录</div>
-    ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.color}"></span><div style="flex:1"><div>${esc(r.txt)}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
+    ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
   </div>`;
 }
 function buildRecent(){
   const list=[];
-  S.behaviors.forEach(b=>{list.push({t:b.time,dot:"var(--brand)",color:"var(--brand)",txt:studentName(b.studentId)+" · "+b.type+"："+(b.reason||"")});});
+  S.behaviors.forEach(b=>{
+    const col=typeColor(b.type);
+    const soft=typeSoft(b.type);
+    const d=b.delta||0;
+    const dBadge=d?`<b style="color:${d>0?'var(--ok)':'var(--bad)'};font-weight:700">${d>0?'+'+d:d}</b>`:'';
+    const tag=`<span class="chip" style="background:${soft};color:${col};border-color:transparent">${esc(b.type)}</span>`;
+    const reason=b.reason?` · ${esc(b.reason)}`:'';
+    list.push({t:b.time,dot:col,txt:`${esc(studentName(b.studentId))} ${tag}${dBadge?` ${dBadge}`:''}${reason}`});
+  });
   S.points.logs.forEach(p=>{
-    const sign=p.delta>0?"+":"";
-    const reason=p.reason?"（"+p.reason+"）":"";
     const c=p.delta>=0?"var(--ok)":"var(--bad)";
-    list.push({t:p.time,dot:c,color:c,txt:studentName(p.studentId)+" 积分 "+sign+p.delta+reason});
+    const sign=p.delta>0?"+":"";
+    const reason=p.reason?` · ${esc(p.reason)}`:'';
+    list.push({t:p.time,dot:c,txt:`${esc(studentName(p.studentId))} <b style="color:${c};font-weight:700">${sign}${p.delta}</b>${reason}`});
   });
   list.sort((a,b)=>(b.t||"").localeCompare(a.t||""));
   return list;
@@ -1012,6 +1038,8 @@ function rosterColOn(c){
   return H[c.c]?H[c.c]():true;
 }
 function viewRoster(v){
+  /* 重渲前记住表格内部滚动位置，渲染后恢复（删除/编辑/排序/搜索后停在原处） */
+  const _old=v.querySelector(".tbl-scroll"),_st=_old?_old.scrollTop:0;
   const cols=ROSTER_COLS.filter(rosterColOn);
   v.innerHTML=`
   <div class="card pad">
@@ -1029,6 +1057,8 @@ function viewRoster(v){
     </div>
     ${rosterHistHtml()}
   </div>`;
+  const _new=v.querySelector(".tbl-scroll");
+  if(_new&&_st)_new.scrollTop=_st;
 }
 /* 名册历史（折叠） */
 function rosterHistHtml(){
@@ -1114,8 +1144,8 @@ function rosterRows(cols){
   const TC={A:"tier-a",B:"tier-b",C:"tier-c"};
   const TD={
     "c-no":s=>`<td class="c-no">${esc(s.no)}</td>`,
-    "c-name":s=>`<td class="c-name"><b>${esc(s.name)}</b></td>`,
-    "c-tier":s=>`<td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>`,
+    "c-name":s=>`<td class="c-name"><b style="cursor:pointer" title="查看最近表现" onclick="W.stuRecent('${s.id}')">${esc(s.name)}</b></td>`,
+    "c-tier":s=>`<td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}" style="cursor:pointer" title="查看最近一次考试成绩" onclick="W.stuLastExam('${s.id}')">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>`,
     "c-phone":s=>`<td class="c-phone">${phoneLink(s.phone)}</td>`,
     "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
     "c-g":s=>`<td class="c-g">${esc(s.g)}</td>`,
@@ -1126,6 +1156,42 @@ function rosterRows(cols){
   };
   return list.map(s=>`<tr>${CS.map(c=>TD[c.c](s)).join("")}</tr>`).join("");
 }
+/* 点姓名：最近表现（该生行为记录，倒序取 15 条） */
+W.stuRecent=sid=>{
+  const st=el(sid,S.students);if(!st)return;
+  const list=S.behaviors.filter(b=>b.studentId===sid)
+    .sort((a,b)=>(b.time||"").localeCompare(a.time||"")).slice(0,15);
+  const rows=list.map(b=>{
+    const d=b.delta||0;
+    const c=d>0?"var(--ok)":d<0?"var(--bad)":"var(--muted)";
+    return `<div class="r-item" style="padding:7px 0">
+      <div style="flex:1;min-width:0"><b>${esc(b.type)}</b>${b.reason?`<span class="small muted">：${esc(b.reason)}</span>`:""}<div class="tiny muted">${esc(b.time||"")}</div></div>
+      <span style="flex:none"><b style="color:${c}">${d>0?"+":""}${d}</b></span></div>`;}).join("");
+  openModal(`<h3>${esc(st.name)} · 最近表现</h3>
+  ${rows||`<div class="empty">暂无表现记录</div>`}
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
+/* 点等级：最近一次有该生成绩的考试，逐科分数+名次+总分 */
+W.stuLastExam=sid=>{
+  const st=el(sid,S.students);if(!st)return;
+  const ex=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).reverse()
+    .find(e=>{const sc=e.scores[sid]||{};return e.subjects.some(sub=>sc[sub]!==undefined&&sc[sub]!=="");});
+  if(!ex){openModal(`<h3>${esc(st.name)} · 成绩</h3><div class="empty">暂无考试成绩</div><div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);return;}
+  const sc=ex.scores[sid]||{};
+  const rows=ex.subjects.map(sub=>{
+    const v=(sc[sub]===undefined||sc[sub]==="")?null:+sc[sub];
+    const rk=v!==null?subjRankMap(ex,sub)[sid]:null;
+    return `<div class="r-item" style="padding:6px 0"><div style="flex:1">${esc(sub)}</div>
+      <span class="row" style="gap:10px;flex:none"><b>${v!==null?v:"—"}</b>${rk?`<span class="tiny ${rk<=3?"":"muted"}" style="${rk<=3?"color:var(--warn)":""}">第${rk}名</span>`:""}</span></div>`;}).join("");
+  let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
+  const tr=n?gradeRanks(ex)[sid]:null;
+  openModal(`<h3>${esc(st.name)} · 最近考试成绩</h3>
+  <div class="tiny muted" style="margin:-6px 0 8px">${esc(ex.name)} · ${esc(ex.date||"")}</div>
+  ${rows}
+  ${n?`<div class="r-item" style="padding:7px 0 2px;border-top:1px solid var(--line)"><div style="flex:1"><b>总分</b></div>
+    <span class="row" style="gap:10px;flex:none"><b>${sum}</b>${tr?`<span class="tiny ${tr<=3?"":"muted"}" style="${tr<=3?"color:var(--warn)":""}">第${tr}名</span>`:""}</span></div>`:""}
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
 
 /* ============ GRADES ============ */
 let gradeExam=null;
@@ -1178,7 +1244,7 @@ function viewGrades(v){
     </div>
   </div>
   ${gradeTrendHtml()}
-  <div class="card pad">
+  <div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">成绩（${ex.subjects.length} 科）${prevNames.length===1?`<span class="tiny muted" style="margin-left:8px;font-weight:400">进退步对比：${esc(prevNames[0])}</span>`:prevNames.length>1?`<span class="tiny muted" style="margin-left:8px;font-weight:400">进退步对比：各科上次考试（${esc(prevNames.join("、"))}）</span>`:`<span class="tiny muted" style="margin-left:8px;font-weight:400">暂无上一场考试，进退步显示 —</span>`}</span>
       <div class="row">
         <button class="btn ${gradeEdit?"":"ghost"} sm" onclick="gradeEdit=!gradeEdit;viewGrades(document.getElementById('view'))">${gradeEdit?"✓ 完成编辑":"✎ 编辑成绩"}</button>
@@ -1265,12 +1331,17 @@ function deltaCell(cur,old){
   return `<td class="mini g-delta"><b style="color:${d>0?"var(--ok)":"var(--bad)"}">${d>0?"+"+d:d}</b></td>`;
 }
 /* ---- 成绩曲线：各科每次考试的班级平均分折线（纯 SVG） ---- */
+let trendSub=null;/* 图例点选聚焦的科目；null=全部显示（仅会话内，刷新复位） */
+let trendMark=null;/* 曲线数据点标注：{sub,i}，点按在曲线上显示该点均分，再点取消（仅会话内） */
 function gradeTrendHtml(){
   const exams=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   if(!exams.length)return "";
   const subs=[];exams.forEach(e=>e.subjects.forEach(s=>{if(!subs.includes(s))subs.push(s);}));
   if(!subs.length)return "";
-  const series=subs.map(sub=>({sub,pts:exams.map(e=>{
+  /* 每科固定一种颜色：常见科目走 SUBJ_COLOR_MAP（色相分散，物理/生物等互不相近），未列入的按名散列兜底 */
+  const colOf={};subs.forEach(s=>colOf[s]=subjColor(s));
+  const show=(trendSub&&subs.includes(trendSub))?[trendSub]:subs;
+  const series=show.map(sub=>({sub,pts:exams.map(e=>{
     let t=0,n=0;S.students.forEach(s=>{const v=(e.scores[s.id]||{})[sub];if(v!==undefined&&v!==""){t+=+v;n++;}});
     return n?t/n:null;})}));
   let maxV=0;series.forEach(se=>se.pts.forEach(v=>{if(v!==null&&v>maxV)maxV=v;}));
@@ -1285,20 +1356,42 @@ function gradeTrendHtml(){
   exams.forEach((e,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(e.name.length>4?e.name.slice(0,4):e.name)}</text>`;});
   let paths="",dots="";
   series.forEach(se=>{
-    const c=subjColor(se.sub);
+    const c=colOf[se.sub];
     const seg=se.pts.map((v,i)=>v===null?null:[X(i),Y(v)]);
     let d="",open=false;
     seg.forEach(p=>{if(p){d+=(open?" L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);open=true;}else open=false;});
     if(d)paths+=`<path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
-    seg.forEach((p,i)=>{if(p)dots+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${c}"><title>${esc(se.sub)} · ${esc(exams[i].name)}：均分 ${Math.round(se.pts[i]*10)/10}</title></circle>`;});
+    seg.forEach((p,i)=>{
+      if(!p)return;
+      const val=se.pts[i],isMark=trendMark&&trendMark.sub===se.sub&&trendMark.i===i;
+      dots+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="${c}" style="cursor:pointer" onclick="W.trendPoint('${exams[i].id}','${esc(se.sub)}')"><title>${esc(se.sub)} · ${esc(exams[i].name)}：均分 ${val!=null?Math.round(val*10)/10:"—"}，点按在曲线上标注均分</title></circle>`;
+      if(isMark){
+        dots+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="6.5" fill="none" stroke="${c}" stroke-width="1.5"/>`;
+        dots+=`<text x="${(p[0]+7).toFixed(1)}" y="${(p[1]-8).toFixed(1)}" font-size="11" font-weight="700" fill="${c}" style="paint-order:stroke;stroke:var(--bg);stroke-width:3px">${val!=null?Math.round(val*10)/10:"—"}</text>`;
+      }
+    });
   });
-  const legend=subs.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px"><i style="width:8px;height:8px;border-radius:50%;background:${subjColor(s)}"></i>${esc(s)}</span>`).join("");
+  const legend=subs.map(s=>{
+    const act=trendSub===s,dim=trendSub&&!act;
+    return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;user-select:none;${act?"font-weight:700":""}${dim?";opacity:.35":""}" onclick="W.trendFocus('${esc(s)}')" title="${act?"点按显示全部科目":"点按只看该科目"}"><i style="width:8px;height:8px;border-radius:50%;background:${colOf[s]}"></i>${esc(s)}</span>`;
+  }).join("");
   return `<div class="card pad" style="margin-top:12px">
-    <div class="between row wrap" style="margin-bottom:6px"><span class="section-title" style="margin:0">成绩曲线</span><span class="tiny muted">各科每次考试 · 班级平均分</span></div>
+    <div class="between row wrap" style="margin-bottom:6px"><span class="section-title" style="margin:0">成绩曲线</span><span class="tiny muted">${trendSub?"只看："+esc(trendSub):"各科每次考试 · 班级平均分"}</span></div>
     <div class="row wrap" style="gap:10px;margin-bottom:4px">${legend}</div>
     <svg viewBox="0 0 ${W2} ${H}" style="width:100%;height:auto;display:block">${g}${paths}${dots}</svg>
   </div>`;
 }
+/* 图例点选：聚焦单科 / 再点恢复全部 */
+W.trendFocus=sub=>{trendSub=trendSub===sub?null:sub;viewGrades(document.getElementById("view"));};
+/* 点曲线数据点：在曲线上标注该点均分（班级平均分），再点同一位置取消；点其他科目则切到该科可见 */
+W.trendPoint=(eid,sub)=>{
+  const sorted=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const i=sorted.findIndex(e=>e.id===eid);
+  if(i<0)return;
+  if(trendSub&&trendSub!==sub)trendSub=sub;/* 让被标注的科目可见 */
+  if(trendMark&&trendMark.sub===sub&&trendMark.i===i)trendMark=null;else trendMark={sub,i};
+  viewGrades(document.getElementById("view"));
+};
 /* ---- 分数段分布：当前考试各科分数段人数 ---- */
 function gradeDistHtml(ex){
   let maxV=0;
@@ -1380,7 +1473,8 @@ function applyGradeRules(ex){
     });
   });
   /* 3) 生成记录：每人每科一条，事由 = 具体考试 + 具体科目 + 名次/退步明细（分值全 0 不生成） */
-  const time=nowStr();
+  /* 记录时间 = 考试日期（而非录入时刻），与行为/积分页时间范围过滤兼容 */
+  const time=ex.date||nowStr();
   let n=0;
   Object.keys(det).forEach(id=>{
     Object.keys(det[id]).forEach(sub=>{
@@ -1388,13 +1482,12 @@ function applyGradeRules(ex){
       let reason="",sum=0;
       if(o.bk&&R[o.bk]){
         const pts=R[o.bk];
-        reason+=sub+"第"+o.rk+" "+(pts>0?"+":"")+pts;
+        reason+=sub+"第"+o.rk;
         sum+=pts;
       }
       if(o.drop&&R.drop){
-        const pts=R.drop;
-        reason+=(reason?"；":"")+sub+"退步"+o.drop+"分 "+(pts>0?"+":"")+pts;
-        sum+=pts;
+        reason+=(reason?"；":"")+sub+"退步"+o.drop+"分";
+        sum+=R.drop;
       }
       if(!sum)return;
       const full=ex.name+" "+reason;
@@ -1506,8 +1599,12 @@ function viewBehavior(v){
     </select>`;
   const behCustomBox=bv.mode==="custom"?`<span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).s||"")}" onchange="W.setBehCustom('s',this.value)">
       <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).e||"")}" onchange="W.setBehCustom('e',this.value)">`:"";
-  const filters=`<button class="chip ${!behFilter?"brand":""}" onclick="behFilter='';viewBehavior(document.getElementById('view'))">全部</button>`+
-    types.map(t=>`<button class="chip ${behFilter===t.k?"brand":""}" onclick="behFilter='${esc(t.k)}';viewBehavior(document.getElementById('view'))">${esc(t.k)}</button>`).join("");
+  const allSel=!behFilter;
+  const filters=`<button class="chip" style="${allSel?'box-shadow:0 0 0 1.5px var(--brand);font-weight:700':'opacity:.92'}" onclick="behFilter='';viewBehavior(document.getElementById('view'))">全部</button>`+
+    types.map(t=>{
+      const col=typeColor(t.k),soft=typeSoft(t.k),sel=behFilter===t.k;
+      return `<button class="chip" style="background:${soft};color:${col};border-color:transparent;${sel?'box-shadow:0 0 0 1.5px var(--brand);font-weight:700':''}" onclick="behFilter='${esc(t.k)}';viewBehavior(document.getElementById('view'))">${esc(t.k)}</button>`;
+    }).join("");
   v.innerHTML=`
   <div class="card pad">
     <div class="row wrap" style="gap:8px;margin-bottom:12px">
@@ -1521,12 +1618,13 @@ function viewBehavior(v){
     ${list.length?list.map(b=>{
       const tp=btype(b.type);
       const d=b.delta||0;
-      const dBadge=d?`<span class="chip ${d>0?"ok":"bad"}" style="padding:1px 7px;font-size:11.5px;font-variant-numeric:tabular-nums">${d>0?"+"+d:d}分</span>`:"";
-      return `<div class="r-item"><span class="r-dot" style="background:${behColor(tp.c)};color:${behColor(tp.c)}"></span>
+      const dBadge=d?`<span class="chip ${d>0?"ok":"bad"}" style="padding:1px 7px;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums">${d>0?"+"+d:d}分</span>`:"";
+      const col=typeColor(b.type),soft=typeSoft(b.type);
+      return `<div class="r-item"><span class="r-dot" style="background:${col};color:${col}"></span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b>${esc(studentName(b.studentId))}</b>
-          <span class="chip ${tp.c}" style="padding:1px 8px;font-size:11.5px">${esc(b.type)}</span>
+          <span class="chip" style="background:${soft};color:${col};border-color:transparent;padding:1px 8px;font-size:11.5px">${esc(b.type)}</span>
           ${dBadge}
           <span class="muted" style="font-size:13px">${esc(b.reason||"")}</span>
         </div>
@@ -1828,7 +1926,7 @@ function viewTiers(v){
   if(S.tierCfg.gradeRange===undefined)S.tierCfg.gradeRange=1;
   if(S.tierCfg.pointRange===undefined)S.tierCfg.pointRange="all";
   const {exams:selExams,rows}=computeTiers();save();
-  const BC={A:"brand",B:"warn",C:"ok"};
+  const BC={A:"ok",B:"warn",C:"bad"};/* 与排位/名册保持一致：A 绿 / B 琥珀 / C 红 */
   const grSel=`<label class="tiny muted">成绩范围<select class="fld h30" style="width:auto;margin-left:4px" onchange="W.setGradeRange(this.value)">${[["1","最近1次"],["2","最近2次"],["3","最近3次"],["all","全部考试"]].map(o=>`<option value="${o[0]}" ${String(S.tierCfg.gradeRange)===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select></label>`;
   const prSel=`<label class="tiny muted">积分范围<select class="fld h30" style="width:auto;margin-left:4px" onchange="W.setPointRange(this.value)">${[["7","最近7天"],["30","最近30天"],["all","全部"]].map(o=>`<option value="${o[0]}" ${String(S.tierCfg.pointRange)===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select></label>`;
   const subjSet=[];S.exams.forEach(e=>e.subjects.forEach(s=>{if(!subjSet.includes(s))subjSet.push(s);}));
@@ -2061,7 +2159,7 @@ function viewPoints(v){
   ${isRdm?"":`<div class="card pad" style="margin-top:14px">
     <div class="section-title">最近加减分<span class="tiny muted" style="font-weight:400;margin-left:6px">${esc(ptRangeLabel())}</span></div>
     ${(()=>{const ls=(S.points.logs||[]).filter(l=>ptLogIn(l,_b)).slice().reverse().slice(0,12);return ls.length?ls.map(l=>{const c=l.delta>=0?'var(--ok)':'var(--bad)';return `<div class="r-item"><span class="r-dot" style="background:${c};color:${c}"></span>
-      <div style="flex:1"><div>${esc(studentName(l.studentId))} <b>${l.delta>0?"+":""}${l.delta}</b> ${esc(l.reason?"· "+l.reason:"")}</div><div class="tiny muted">${esc(l.time)}</div></div></div>`;}).join(""):`<div class="empty">该时间范围内没有记录</div>`;})()}
+      <div style="flex:1"><div>${esc(studentName(l.studentId))} <b style="color:${c}">${l.delta>0?"+":""}${l.delta}</b> ${esc(l.reason?"· "+l.reason:"")}</div><div class="tiny muted">${esc(l.time)}</div></div></div>`;}).join(""):`<div class="empty">该时间范围内没有记录</div>`;})()}
   </div>`}`;
 }
 
@@ -2387,11 +2485,19 @@ function viewLottery(v){
 
 /* ============ SCHEDULE ============ */
 const DAYS=[["1","周一"],["2","周二"],["3","周三"],["4","周四"],["5","周五"]];
-/* 科目配色：同一科目始终同色（按名称散列取固定色板，与顺序、增删无关） */
+/* 科目配色：常见科目固定一组按色相尽量分散的颜色（不再按出现顺序取色，避免相邻科撞色）。
+   物理=橙、生物=青绿，二者明显区分；英语=绿、政治=黄、语文=红、数学=蓝、化学=紫、历史=棕、地理=粉、体育=青蓝。
+   兜底调色板：未列入上表的科目按名称散列取色。 */
+const SUBJ_COLOR_MAP={
+  "语文":"#e15759","数学":"#4e79a7","英语":"#59a14f","物理":"#f28e2b",
+  "化学":"#b07aa1","生物":"#16a085","政治":"#f1c40f","历史":"#9c755f",
+  "地理":"#e84393","体育":"#0ea5e9","音乐":"#8e44ad","美术":"#7f8c8d"
+};
 const SUBJ_COLORS=["#4f6bed","#0ea5e9","#14b8a6","#22c55e","#84cc16","#f59e0b","#f97316","#ef4444","#ec4899","#8b5cf6"];
 function subjColor(sub){
   const t=String(sub||"").trim();
   if(!t)return "var(--line)";
+  if(SUBJ_COLOR_MAP[t])return SUBJ_COLOR_MAP[t];
   let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))>>>0;
   return SUBJ_COLORS[h%SUBJ_COLORS.length];
 }
@@ -2541,7 +2647,9 @@ W.saveStudent=id=>{
   const name=$("#m_name").value.trim();if(!name){toast("请填姓名");return;}
   const data={name,no:$("#m_no").value.trim(),sex:$("#m_sex").value,g:$("#m_g").value.trim(),tier:$("#m_tier")?$("#m_tier").value:"",phone:phoneList($("#m_phone").value).join(" / "),height:+$("#m_h").value||0,note:$("#m_note").value.trim()};
   if(id){Object.assign(el(id,S.students),data);}else{S.students.push({id:uid(),...data});}
-  save();closeModal();refresh();
+  save();closeModal();
+  /* 就地重渲名册，保持滚动位置（不整页 route，避免跳回顶部） */
+  const y=window.scrollY;viewRoster(document.getElementById("view"));window.scrollTo(0,y);
 };
 W.sortRoster=k=>{
   /* 两态：升序 → 降序 循环，不回到原顺序 */
@@ -2549,7 +2657,12 @@ W.sortRoster=k=>{
   else{rosterSort.dir=rosterSort.dir===1?-1:1;}
   viewRoster(document.getElementById("view"));
 };
-W.delStudent=id=>{if(!confirm("删除该学生？相关成绩/积分记录会保留为孤立数据。"))return;S.students=S.students.filter(s=>s.id!==id);save();refresh();};
+W.delStudent=id=>{
+  if(!confirm("删除该学生？相关成绩/积分记录会保留为孤立数据。"))return;
+  S.students=S.students.filter(s=>s.id!==id);save();
+  /* 就地重渲名册，保持滚动位置（不整页 route，避免跳回顶部） */
+  const y=window.scrollY;viewRoster(document.getElementById("view"));window.scrollTo(0,y);
+};
 W.importRoster=()=>{
   /* 点击即弹出系统文件选择窗口，不再经弹窗中转 */
   pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
@@ -2767,10 +2880,11 @@ W.delBehavior=id=>{
 W.manageBehTypes=()=>{
   ensureGradeType();/* 老数据没有「成绩」类别时按需补上 */
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
-  const row=t=>`<div class="r-item" style="padding:7px 0">
+  const row=t=>{const col=typeColor(t.k),soft=typeSoft(t.k);return `<div class="r-item" style="padding:7px 0">
     <input class="fld" style="flex:1;min-width:0;padding:5px 8px" value="${esc(t.k)}" onchange="W.renameBehType('${esc(t.k)}',this.value)">
+    <span class="chip" style="background:${soft};color:${col};border-color:transparent;padding:1px 8px;font-size:11.5px;flex:none">${esc(t.k)}</span>
     <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${t.pts||0}" title="分值：正为加分，负为扣分" onchange="W.setBehTypePts('${esc(t.k)}',this.value)">
-    <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;
+    <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;};
   const R=gradeRules();
   const ruleRow=([k,label])=>`<div class="r-item" style="padding:7px 0">
     <span style="flex:1;min-width:0;font-size:13px">${esc(label)}</span>
@@ -2824,11 +2938,11 @@ W.renderBehTypes=()=>{
 function viewBehTypes(v){
   ensureGradeType();
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
-  const row=t=>`<div class="r-item" style="padding:7px 0">
+  const row=t=>{const col=typeColor(t.k),soft=typeSoft(t.k);return `<div class="r-item" style="padding:7px 0">
     <input class="fld" style="flex:1;min-width:0;padding:5px 8px" value="${esc(t.k)}" onchange="W.renameBehType('${esc(t.k)}',this.value)">
-    <span class="chip ${t.c}" style="padding:1px 8px;font-size:11.5px;flex:none">${esc(t.k)}</span>
+    <span class="chip" style="background:${soft};color:${col};border-color:transparent;padding:1px 8px;font-size:11.5px;flex:none">${esc(t.k)}</span>
     <input class="fld" style="width:76px;padding:5px 8px" type="number" value="${t.pts||0}" title="分值：正为加分，负为扣分" onchange="W.setBehTypePts('${esc(t.k)}',this.value)">
-    <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;
+    <button class="btn ghost sm" onclick="W.delBehType('${esc(t.k)}')">删</button></div>`;};
   const R=gradeRules();
   const ruleRow=([k,label])=>`<div class="r-item" style="padding:7px 0">
     <span style="flex:1;min-width:0;font-size:13px">${esc(label)}</span>
@@ -4553,6 +4667,8 @@ async function adoptRemoteData(r){
   const hasLocal=!!localStorage.getItem(KEY);
   if(hasLocal&&!S._demo){try{localStorage.setItem(KEY+"_bak",JSON.stringify(S));}catch(e){}}
   S=Object.assign(def(),r.data);
+  fixGradeReason();/* 云端数据可能含旧格式事由 */
+  fixExamRecordTime();/* 云端数据可能含旧格式时间 */
   localStorage.setItem(KEY,JSON.stringify(S));
   const cfg=cloudCfg();cfg.lastSync=Date.now();cfg.baseAt=(r.data&&r.data._savedAt)||0;cloudCfgSave(cfg);
   cloudReady=true;cloudStatus("ok","已从云端载入");route();
@@ -4712,10 +4828,45 @@ function migrateRedeemV3(){
   }
   S.mig.redeemV3=true;
 }
+/* 一次性迁移：自动记分的事由里不再重复写分值（分值由标签/积分明细自身显示）。
+   移除各科明细末尾的 " +N" / " -N"，并清理多余空格。 */
+function fixGradeReason(){
+  const re=/(^|[；\s])[+-]\d+/g;
+  let dirty=false;
+  S.behaviors.forEach(b=>{
+    if(b.auto===GRADE_TYPE&&b.reason){
+      const nv=b.reason.replace(/ ?[+-]\d+(?=$|；)/g,"");
+      if(nv!==b.reason){b.reason=nv;dirty=true;}
+    }
+  });
+  (S.points.logs||[]).forEach(l=>{
+    if(l.auto===GRADE_TYPE&&l.reason){
+      const nv=l.reason.replace(/ ?[+-]\d+(?=$|；)/g,"");
+      if(nv!==l.reason){l.reason=nv;dirty=true;}
+    }
+  });
+  if(dirty)save();
+}
+/* 一次性迁移：成绩规则自动记分的时间应为考试日期；只改时间不一致的记录，不动积分 */
+function fixExamRecordTime(){
+  let dirty=false;
+  S.exams.forEach(ex=>{
+    if(!ex.date)return;
+    S.behaviors.forEach(b=>{
+      if(b.auto===GRADE_TYPE&&b.examId===ex.id&&(b.time||"").slice(0,10)!==ex.date){b.time=ex.date;dirty=true;}
+    });
+    (S.points.logs||[]).forEach(l=>{
+      if(l.auto===GRADE_TYPE&&l.examId===ex.id&&(l.time||"").slice(0,10)!==ex.date){l.time=ex.date;dirty=true;}
+    });
+  });
+  if(dirty)save();
+}
 function init(){
   /* 不再自动灌示例数据：空数据保持空白，需要示例时在「数据」页手动点「示例」 */
   migrateRedeemV2();
   migrateRedeemV3();
+  fixGradeReason();/* 自动记分事由不再重复分值 */
+  fixExamRecordTime();/* 成绩自动记分时间 = 考试日期：仅修正时间不一致的旧记录（幂等） */
   buildNav();applyTheme();
   runJobAuto();/* 班级工作：周期末自动计入职务加分（幂等，不立即算分） */
   setInterval(()=>{runJobAuto();},60000);/* 页面开着时每 60 秒检查，命中周期末即自动记 */
