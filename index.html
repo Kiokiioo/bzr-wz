@@ -55,7 +55,8 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;margin-bottom:2px}
 .nav a .ic{width:22px;text-align:center;font-size:16px;flex:none}
 .nav a:hover{background:var(--panel-2)}
-.nav a.active{background:var(--brand-soft);color:var(--brand-ink)}
+.nav a.active{background:var(--brand);color:var(--bg);font-weight:700;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 40%,transparent)}
+.nav a.active:hover{background:var(--brand)}
 .side-foot{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center}
 .icon-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;width:34px;height:34px;display:grid;place-items:center;color:var(--ink-2);font-size:15px}
 .icon-btn:hover{color:var(--ink)}
@@ -396,12 +397,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
 
 /* schedule */
 .sched-scroll{overflow-x:auto}
-.sched{display:grid;grid-template-columns:20px repeat(5,max-content);gap:6px;justify-content:start}
+.sched{display:grid;grid-template-columns:max-content repeat(5,max-content);gap:6px;justify-content:start}
 .sched-head,.sched-row{display:contents}
-.sched .p{display:grid;place-items:center;align-content:center;gap:1px;font-size:12px;color:var(--ink-2);font-weight:600;min-width:0;text-align:center}
-.sched .p .p-t{font-size:10px;color:var(--ink-3);font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:0}
+.sched .p{display:grid;place-items:center;align-content:center;gap:1px;font-size:12px;color:var(--ink-2);font-weight:600;min-width:0;text-align:center;padding:0 2px;position:sticky;left:0;z-index:2;background:var(--panel)}
+.sched .p>span{white-space:nowrap}
+.sched .p .p-t{font-size:10px;color:var(--ink-3);font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap}
+.sched .p.today{color:var(--brand-ink);background:color-mix(in srgb,var(--brand) 8%,var(--panel));border-radius:8px}
 .sched .cell{position:relative;min-height:46px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:9px;background:var(--panel);padding:6px 8px;font-size:12px;display:flex;flex-direction:column;justify-content:center;gap:2px}
-.sched .p.today{color:var(--brand-ink);background:color-mix(in srgb,var(--brand) 8%,transparent);border-radius:8px}
 .sched .cell.today{background:var(--brand-soft)}
 .sched .cell .sub{font-weight:700;font-size:12.5px;white-space:nowrap;align-self:center}
 .sched .cell .tch{color:var(--ink-2);font-size:11px;white-space:nowrap;align-self:center}
@@ -440,7 +442,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .app{grid-template-columns:1fr;height:auto;min-height:100vh;overflow-x:hidden}
   .side{display:none}
   .main{height:auto;padding-bottom:64px;min-width:0}
-  .topbar{position:sticky;top:0;z-index:20;padding:0 14px;gap:8px;min-width:0}
+  .topbar{position:sticky;top:0;z-index:20;padding:0 14px;gap:8px;min-width:0;background:var(--bg);border-bottom:none}
   .topbar h1{font-size:16px;min-width:0}
   .topbar .sub{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:100%}
   .topbar > div{min-width:0;flex:1}
@@ -453,7 +455,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .main{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   .bottom a{flex:0 0 auto;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:var(--ink-2);font-size:11px;font-weight:600;padding:4px 2px;white-space:nowrap}
   .bottom a .ic{font-size:18px}
-  .bottom a.active{color:var(--brand-ink)}
+  .bottom a.active{color:var(--brand-ink);background:var(--brand-soft);border-radius:11px;font-weight:700;padding:4px 8px}
   .hero{grid-template-columns:1fr;min-width:0}
   .hero > *{min-width:0}
   .hero .today .between.row{flex-wrap:wrap;gap:6px}
@@ -489,6 +491,9 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .st-tag{min-height:52px;font-size:10px}
   .tbl-scroll{max-height:none;-webkit-overflow-scrolling:touch}
   .sched-scroll{-webkit-overflow-scrolling:touch}
+  /* 手机端隐藏所有滚动条（内容仍可滚动） */
+  *{scrollbar-width:none}
+  *::-webkit-scrollbar{display:none}
 }
 </style>
 </head>
@@ -988,7 +993,23 @@ function sortTh(key,label,cls){
   const arrow=on?(rosterSort.dir===1?"▲":"▼"):"↕";
   return `<th class="sortable ${cls||""} ${on?"on":""}" onclick="W.sortRoster('${key}')" title="点击排序">${label}<span class="sort-ind">${arrow}</span></th>`;
 }
+/* 列是否显示：姓名/操作恒显示；其余列在所有学生都没填该项时默认隐藏 */
+function rosterColOn(c){
+  if(c.c==="c-name"||c.c==="c-act")return true;
+  if(!S.students.length)return true;
+  const H={
+    "c-no":()=>S.students.some(s=>String(s.no||"").trim()!==""),
+    "c-tier":()=>S.students.some(s=>tierOf(s)),
+    "c-phone":()=>S.students.some(s=>phoneList(s.phone).length>0),
+    "c-note":()=>S.students.some(s=>String(s.note||"").trim()!==""),
+    "c-g":()=>S.students.some(s=>String(s.g||"").trim()!==""),
+    "c-sex":()=>S.students.some(s=>String(s.sex||"").trim()!==""),
+    "c-h":()=>S.students.some(s=>+s.height>0)
+  };
+  return H[c.c]?H[c.c]():true;
+}
 function viewRoster(v){
+  const cols=ROSTER_COLS.filter(rosterColOn);
   v.innerHTML=`
   <div class="card pad">
     <div style="margin-bottom:8px"><input class="fld h36" style="width:100%" placeholder="搜索姓名 / 学号 / 学习组…" value="${esc(rosterKw)}" oninput="rosterKw=this.value;viewRoster(document.getElementById('view'))"></div>
@@ -998,8 +1019,8 @@ function viewRoster(v){
       <button class="btn sm h30" onclick="W.editStudent()">+ 添加</button>
     </div>
     <div class="tbl-scroll">
-      <table class="tbl roster"><thead><tr>${ROSTER_COLS.map(c=>c.k?sortTh(c.k,c.t,c.c):`<th class="${c.c}">${c.t}</th>`).join("")}</tr></thead>
-      <tbody>${rosterRows()}</tbody></table>
+      <table class="tbl roster"><thead><tr>${cols.map(c=>c.k?sortTh(c.k,c.t,c.c):`<th class="${c.c}">${c.t}</th>`).join("")}</tr></thead>
+      <tbody>${rosterRows(cols)}</tbody></table>
     </div>
   </div>`;
 }
@@ -1029,27 +1050,35 @@ function rosterList(){
   }
   return list;
 }
-function rosterRows(){
+function rosterRows(cols){
   const list=rosterList();
+  const CS=cols||ROSTER_COLS.filter(rosterColOn);
   if(!list.length)return `<tr><td colspan="9"><div class="empty"><div class="big">👥</div>还没有学生，点「添加」或 CSV 导入</div></td></tr>`;
   const TC={A:"tier-a",B:"tier-b",C:"tier-c"};
-  return list.map(s=>`<tr>
-    <td class="c-no">${esc(s.no)}</td>
-    <td class="c-name"><b>${esc(s.name)}</b></td>
-    <td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>
-    <td class="c-phone">${phoneLink(s.phone)}</td>
-    <td class="c-note">${esc(s.note)||"—"}</td>
-    <td class="c-g">${esc(s.g)}</td>
-    <td class="c-sex">${esc(s.sex)}</td>
-    <td class="c-h">${s.height||"—"}</td>
-    <td class="c-act"><span class="act"><button class="btn ghost sm h24" onclick="W.editStudent('${s.id}')">编辑</button>
-    <button class="btn danger sm h24" onclick="W.delStudent('${s.id}')">删除</button></span></td></tr>`).join("");
+  const TD={
+    "c-no":s=>`<td class="c-no">${esc(s.no)}</td>`,
+    "c-name":s=>`<td class="c-name"><b>${esc(s.name)}</b></td>`,
+    "c-tier":s=>`<td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>`,
+    "c-phone":s=>`<td class="c-phone">${phoneLink(s.phone)}</td>`,
+    "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
+    "c-g":s=>`<td class="c-g">${esc(s.g)}</td>`,
+    "c-sex":s=>`<td class="c-sex">${esc(s.sex)}</td>`,
+    "c-h":s=>`<td class="c-h">${s.height||"—"}</td>`,
+    "c-act":s=>`<td class="c-act"><span class="act"><button class="btn ghost sm h24" onclick="W.editStudent('${s.id}')">编辑</button>
+    <button class="btn danger sm h24" onclick="W.delStudent('${s.id}')">删除</button></span></td>`
+  };
+  return list.map(s=>`<tr>${CS.map(c=>TD[c.c](s)).join("")}</tr>`).join("");
 }
 
 /* ============ GRADES ============ */
 let gradeExam=null;
 /* ============ GRADES ============ */
 let gradeEdit=false;
+let gSort=null;/* 成绩表排序：{k:"name"|"sum"|科目, dir:1升|-1降}；null=默认名册顺序 */
+W.sortGrades=k=>{
+  if(gSort&&gSort.k===k)gSort.dir=-gSort.dir;else gSort={k,dir:1};
+  viewGrades(document.getElementById("view"));
+};
 function viewGrades(v){
   if(!S.exams.length){v.innerHTML=`<div class="card pad" style="text-align:center"><div class="empty"><div class="big">📊</div>还没有考试，先添加一场</div><button class="btn" onclick="W.newExam()" style="margin-top:10px">添加</button></div>`;return;}
   if(!gradeExam||!el(gradeExam,S.exams))gradeExam=S.exams[0].id;
@@ -1057,6 +1086,26 @@ function viewGrades(v){
   const ranks=gradeRanks(ex);
   const prev=prevExam(ex);
   const subjRanks={};ex.subjects.forEach(sub=>subjRanks[sub]=subjRankMap(ex,sub));
+  /* 排序：按 gSort 对学生排序（空值沉底），默认保持名册顺序 */
+  const valOf=(s,k)=>{
+    if(k==="name")return s.name;
+    const sc=ex.scores[s.id]||{};
+    if(k==="sum"){let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});return n?sum:null;}
+    const v2=sc[k];return (v2===undefined||v2==="")?null:+v2;
+  };
+  const rows=[...S.students];
+  if(gSort){
+    const dir=gSort.dir;
+    rows.sort((a,b)=>{
+      const va=valOf(a,gSort.k),vb=valOf(b,gSort.k);
+      if(va===null&&vb===null)return 0;
+      if(va===null)return 1;if(vb===null)return -1;
+      if(gSort.k==="name")return va.localeCompare(vb,"zh")*dir;
+      return (va-vb)*dir;
+    });
+  }
+  const arrow=(k)=>gSort&&gSort.k===k?(gSort.dir===1?" ▲":" ▼"):"";
+  const thCls=(k)=>gSort&&gSort.k===k?" sortable on":" sortable";
   v.innerHTML=`
   <div class="between row wrap" style="margin-bottom:12px">
     <div class="row" style="gap:8px">
@@ -1076,8 +1125,8 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name">姓名</th>${ex.subjects.map(s=>`<th class="g-sub">${esc(s)}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>`).join("")}<th class="g-total">总分</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th></tr></thead>
-      <tbody>${S.students.map(s=>{
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th></tr></thead>
+      <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const r=ranks[s.id];
         const psc=prev?prev.scores[s.id]||{}:null;
@@ -1632,8 +1681,11 @@ function viewTiers(v){
   const prSel=`<label class="tiny muted">积分范围<select class="fld h30" style="width:auto;margin-left:4px" onchange="W.setPointRange(this.value)">${[["7","最近7天"],["30","最近30天"],["all","全部"]].map(o=>`<option value="${o[0]}" ${String(S.tierCfg.pointRange)===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select></label>`;
   const subjSet=[];S.exams.forEach(e=>e.subjects.forEach(s=>{if(!subjSet.includes(s))subjSet.push(s);}));
   Object.keys(DEFAULT_SUBJ_W).forEach(s=>{if(!subjSet.includes(s))subjSet.push(s);});
+  /* 重渲染前记住当前展开状态（改参数时不收起）；页面刷新后变量复位 → 默认折叠 */
+  const dw=document.getElementById("tierW");if(dw)tierWOpen=dw.open;
+  const dr=document.getElementById("tierRule");if(dr)tierRuleOpen=dr.open;
   v.innerHTML=`
-  <details class="card pad collapse" style="margin-bottom:12px">
+  <details id="tierW" class="card pad collapse" style="margin-bottom:12px"${tierWOpen?" open":""}>
     <summary>
       <span class="section-title" style="margin:0">权重设置<span class="chev">▸</span></span>
     </summary>
@@ -1671,11 +1723,11 @@ function viewTiers(v){
       </span></div>`;
     }).join(""):`<div class="empty"><div class="big">🏅</div>还没有学生</div>`}
   </div>
-  <details class="card pad" style="margin-top:12px">
+  <details id="tierRule" class="card pad" style="margin-top:12px"${tierRuleOpen?" open":""}>
     <summary style="cursor:pointer;font-weight:700;font-size:14px">计算规则说明</summary>
     <div class="tiny muted" style="line-height:1.9;margin-top:8px">
       1. 总分 = 成绩 × ${S.tierCfg.gw}% + 积分 × ${S.tierCfg.pw}% − 身高 × ${S.tierCfg.hw}%（身高为减项，越矮总分越高；上方权重可随时调整）<br>
-      2. 成绩 = 所选范围（最近1/2/3次或全部考试）内各次考试按科目占比加权平均：默认语、数、英、物各占 20%，生、地各占 10%，政、史不计占比；各科占比可在上方修改；某次考试未录成绩则该次跳过，范围内全无成绩按 0 分计<br>
+      2. 成绩：选最近 1/2/3 次时，各次考试按科目占比加权平均（默认语、数、英、物各占 20%，生、地各占 10%，政、史不计占比，占比可在上方修改）；选「全部考试」时，取每次考试各科<b>原始分总分</b>，再对总分求平均（科目占比不参与）；某次未录成绩则该次跳过，范围内全无成绩按 0 分计<br>
       3. 积分取所选时间范围（最近7天/最近30天/全部）内的加减分合计，全部即当前累计分；积分、身高按全班「最低—最高」线性折算为 0—100 分再计入；未录身高按 50 计<br>
       4. 按总分排名：前 1/3 为 A 等，中间 1/3 为 B 等，后 1/3 为 C 等<br>
       5. 手动设定凌驾于计算规则：如计算为 B 等但手动设为 C 等，最终为 C 等；列表中会标注「计算 B 等，设为 C 等」
@@ -2155,12 +2207,12 @@ function viewLottery(v){
   v.innerHTML=`
   <div class="card pad" style="margin-bottom:14px">
     <div class="lottery-stage" id="lotStage"><span class="lbl" id="lotLbl">待抽取：${remain} / ${S.students.length}</span>🎯</div>
-    <div class="row wrap" style="margin-top:14px;gap:8px">
-      <button class="btn" id="drawBtn" onclick="W.drawOne()" ${remain?"":"disabled"}>🎲 抽一人</button>
-      <button class="btn ghost" onclick="W.resetLottery()">重置本轮</button>
+    <div class="row" style="margin-top:14px;gap:8px;justify-content:center">
       <label class="tiny muted" style="display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none">
-        <input type="checkbox" ${rep?"checked":""} onchange="W.toggleLotRepeat(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--brand)">允许重复抽中
+        <input type="checkbox" ${rep?"checked":""} onchange="W.toggleLotRepeat(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--brand)">重复
       </label>
+      <button class="btn ghost" onclick="W.resetLottery()">重置</button>
+      <button class="btn" id="drawBtn" onclick="W.drawOne()" ${remain?"":"disabled"}>抽签</button>
     </div>
   </div>
   <div class="card pad" id="lotLists">${lotListsHtml()}</div>
@@ -2174,9 +2226,8 @@ function viewLottery(v){
       ${S.students.length?`<select class="fld h30" id="punStu" style="width:100%">${S.students.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>`:`<div class="tiny muted">名册里还没有学生</div>`}
     </div>
     <div class="lottery-stage pun" id="punStage"><span class="lbl" id="punLbl">共 ${puns.length} 条惩罚${logs.length?` · 已抽 ${logs.length} 次`:""}</span>${last?esc(last.name):"🎯"}</div>
-    <div class="row wrap" style="margin-top:14px;gap:8px">
+    <div class="row" style="margin-top:14px;gap:8px;justify-content:flex-end">
       <button class="btn" id="punBtn" onclick="W.drawPun()" ${(puns.length&&S.students.length)?"":"disabled"}>🎯 抽惩罚</button>
-      <span class="tiny muted" style="align-self:center">先选定学生，再随机抽一条惩罚，结果自动记入下方记录</span>
     </div>
   </div>
   <div class="card pad" id="punLists" style="margin-top:14px">${punLogsHtml()}</div>`;
@@ -2203,15 +2254,19 @@ function timeFields(idS,idE,o){
 function readTime(idS,idE){return {s:($("#"+idS).value||"").trim(),e:($("#"+idE).value||"").trim()};}
 function viewSchedule(v){
   const per=effectivePeriods();
+  const wk=schedWeek();
   const todayD=((new Date().getDay()+6)%7)+1; // 1..5 weekday
   const head=`<div class="p"></div>${DAYS.map(d=>`<div class="p ${d[0]==todayD?'today':''}" style="${d[0]==todayD?'color:var(--brand-ink)':''}">${d[1]}</div>`).join("")}`;
   const cellHtml=(d,p,today)=>{
     const c=S.schedule.cells[d+"-"+p];
     const add=`<button class="cell-add" title="${c?"修改这一格":"添加课程"}" onclick="W.editCell('${d}','${p}')">${c?"✎":"+"}</button>`;
-    const first=c&&(c.o||c.e)?(c.o||c.e):c;
+    /* 单双周按当前教学周单独显示：每周课总显示；单/双周课只在与本周奇偶一致时显示。
+       无法推算周次（无学期开始日期或今天早于学期开始）时退回全显示。 */
+    const list=cellEntries(c).filter(([w2])=>!w2||!wk||w2===wk.parity);
+    const first=list.length?list[0][1]:(c&&(c.o||c.e)?(c.o||c.e):c);
     const phone=first&&first.tel?`<a class="cell-phone" href="tel:${esc(first.tel)}" title="拨打 ${esc(first.tch||"任课老师")} ${esc(first.tel)}">☎</a>`:"";
     /* 单双周分列：每门课一行，带「单/双」小标，点课程名可直接编辑该侧 */
-    const body=cellEntries(c).map(([w2,cc])=>{
+    const body=list.map(([w2,cc])=>{
       const tag=w2?`<i class="wtag">${w2==="o"?"单":"双"}</i>`:"";
       const tap=w2?` style="cursor:pointer" title="${wName(w2)}，点按编辑" onclick="W.editCell('${d}','${p}','${w2}')"`:"";
       return `<div class="sub"${tap}><span>${tag}${esc(cc.sub)}</span></div>${cc.tch?`<div class="tch">${esc(cc.tch)}</div>`:""}`;
@@ -2220,8 +2275,7 @@ function viewSchedule(v){
   };
   /* 节次行：行首「第N节」+ 该节次上课时间 */
   const pRow=(p,label,timeStr)=>{
-    const m=label.match(/^第(\d+)节$/);
-    const labelHtml=m?`<span>第</span><span>${m[1]}</span><span>节</span>`:`<span>${label}</span>`;
+    const labelHtml=`<span>${esc(label)}</span>`;
     let s=`<div class="p">${labelHtml}${timeStr?`<span class="p-t">${esc(timeStr)}</span>`:""}</div>`;
     s+=DAYS.map(d=>cellHtml(d[0],p,d[0]==todayD)).join("");
     return s;
@@ -2235,6 +2289,7 @@ function viewSchedule(v){
   evRows.forEach(ek=>rows+=pRow(ek,periodLabel(ek),tRange((S.schedule.times||{})[ek])));
   v.innerHTML=`
   <div class="row wrap" style="justify-content:flex-end;margin-bottom:12px">
+    ${wk?`<span class="chip brand" style="margin-right:auto" title="按学期开始日期推算：开始那一周为第 1 周（单周），依次类推">第 ${wk.n} 周 · ${wName(wk.parity)}</span>`:""}
     <div class="row">
       <button class="btn ghost sm h30" onclick="W.manageTerms()" title="学期管理（归档的学期不出现在时间范围选项里）">学期</button>
       <button class="btn ghost sm h30" onclick="W.saveSchedRecord()" title="把当前课表保存为一条课表记录，存进历史记录，可随时恢复">记录</button>
@@ -3794,7 +3849,7 @@ W.drawOne=()=>{
   const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false});
   const rep=!!cfg.allowRepeat;
   const pool=lotPool();
-  if(!pool.length){toast(rep?"名册里还没有学生":"本轮已全部抽完，点「重置本轮」重新开始");return;}
+  if(!pool.length){toast(rep?"名册里还没有学生":"本轮已全部抽完，点「重置」重新开始");return;}
   const stage=$("#lotStage");const btn=$("#drawBtn");if(btn)btn.disabled=true;stage.classList.add("roll");
   let ticks=0;const max=28;rollTimer=setInterval(()=>{
     const p=pool[Math.floor(Math.random()*pool.length)];
@@ -3951,6 +4006,19 @@ function removeCell(d,p,w){
   if(nv.o||nv.e)S.schedule.cells[key]=nv;else delete S.schedule.cells[key];
 }
 const wName=w=>w==="o"?"单周":w==="e"?"双周":"每周";
+/* 当前教学周：按学期设置的开始日期推算——学期开始所在的一周为第 1 周（单周），依次类推，第 2 周为双周…
+   取「今天所在」的未归档学期（其次取开始日期不晚于今天的最近一个）。返回 {n,parity,name} 或 null（无法推算时不筛选）。 */
+function schedWeek(){
+  const t=todayStr();
+  const terms=(S.terms||[]).filter(x=>x&&!x.archived&&x.start);
+  if(!terms.length)return null;
+  const term=terms.find(x=>x.start<=t&&(!x.end||x.end>=t))||terms.filter(x=>x.start<=t).sort((a,b)=>b.start.localeCompare(a.start))[0];
+  if(!term)return null;
+  const mon=s=>{const dt=new Date(s+"T00:00:00");dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt;};
+  const n=Math.floor((mon(t)-mon(term.start))/604800000)+1;
+  if(n<1)return null;
+  return {n,parity:n%2?"o":"e"};
+}
 W.clearSchedule=()=>{if(!confirm("清空整张课表？"))return;S.schedule.cells={};save();viewSchedule(document.getElementById("view"));};
 /* ---- 课表记录：把当前课表保存为历史快照，可恢复 / 删除（逻辑同排位记录） ----
    快照内容 = S.schedule 全量（cells 课程 + times 各节次上课时间）。 */
@@ -4114,10 +4182,20 @@ function readTextFile(inputId,cb){
   if(!f){cb(null,"请选择文件");return;}
   readFileAsText(f,cb);
 }
-/* 读取 File 为 UTF-8 文本，回调 cb(text, errMsg) */
+/* 读取 File 为文本：先按 UTF-8，读出替换符（U+FFFD）说明多半是 Excel 另存的 ANSI/GBK 编码，自动改按 GBK 重读 */
 function readFileAsText(f,cb){
   const rd=new FileReader();
-  rd.onload=()=>cb(String(rd.result||""),null);
+  rd.onload=()=>{
+    const t=String(rd.result||"");
+    if(t.indexOf("\uFFFD")>=0){
+      const rd2=new FileReader();
+      rd2.onload=()=>cb(String(rd2.result||""),null);
+      rd2.onerror=()=>cb(t,null);/* GBK 也失败则退回原结果 */
+      rd2.readAsText(f,"GBK");
+      return;
+    }
+    cb(t,null);
+  };
   rd.onerror=()=>cb(null,"文件读取失败");
   rd.readAsText(f,"UTF-8");
 }
@@ -4174,26 +4252,30 @@ W.applyGrades=()=>{
     toast("已导入 "+r.n+" 人×"+r.subs+" 科"+(r.miss?"，未找到 "+r.miss+" 人":"")+(r.cnt?"；已自动记录 "+r.cnt+" 条加减分":""));
   }));
 };
-/* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数） */
+/* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数）。
+   表头按列名定位（兼容列顺序变化与中间空列）；「总分/平均/排名」等汇总列自动跳过，
+   使本应用导出的成绩 CSV 可直接回导而不产生假科目。 */
 function applyGradeText(ex,text){
   if(!ex)return {ok:false,msg:"考试不存在"};
   const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(lines.length<2)return {ok:false,msg:"至少需要表头和一行数据"};
   const head=lines[0].split(/[,，]/).map(x=>x.trim());
-  const subs=head.slice(1).filter(Boolean);
-  if(!subs.length)return {ok:false,msg:"表头缺少科目"};
-  subs.forEach(s=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
+  const SKIP={"总分":1,"平均":1,"平均分":1,"排名":1,"名次":1};
+  const cols=[];
+  head.forEach((h,i)=>{if(i>0&&h&&!SKIP[h])cols.push([h,i]);});
+  if(!cols.length)return {ok:false,msg:"表头缺少科目"};
+  cols.forEach(([s])=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
   let n=0,miss=0;
   for(let i=1;i<lines.length;i++){
     const c=lines[i].split(/[,，]/).map(x=>x.trim());
     const st=S.students.find(s=>s.name===c[0]);
     if(!st){miss++;continue;}
     if(!ex.scores[st.id])ex.scores[st.id]={};
-    subs.forEach((sub,k)=>{const v=c[k+1];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
+    cols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
     n++;
   }
   const cnt=applyGradeRules(ex);/* 按成绩规则自动录入加减分记录（幂等，重复导入会覆盖） */
-  return {ok:true,n,miss,subs:subs.length,cnt};
+  return {ok:true,n,miss,subs:cols.length,cnt};
 }
 function nowStr(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());}
 /* 供 datetime-local 输入：YYYY-MM-DDTHH:MM */
