@@ -595,6 +595,9 @@ function def(){
     /* 课表记录：点「记录」保存当前课表快照，可随时恢复。
        {id,name,time,schedule:{cells:{},times:{}}} */
     schedHistory:[],
+    /* 名册历史：点「归档」把当前学生名单（含学习组）存为快照并清空当前名册。
+       {id,name,time,students:[],groups:[]} */
+    rosterHistory:[],
     /* 积分页时间范围：mode = week | month | all | t:<学期id> | custom；custom 用 {s,e} 起止日期 */
     pointView:{mode:"week",custom:{s:"",e:""}},
     /* 行为记录页时间范围：结构与选项同 pointView，但两页各自独立 */
@@ -1016,14 +1019,68 @@ function viewRoster(v){
     <div class="row" style="justify-content:flex-end;margin-bottom:12px">
       <button class="btn ghost sm h30" onclick="W.importRoster()">导入</button>
       <button class="btn ghost sm h30" onclick="W.exportRoster()">导出</button>
+      <button class="btn ghost sm h30" onclick="W.archiveRoster()" title="当前名单存为历史并清空名册">归档</button>
+      <button class="btn danger ghost sm h30" onclick="W.clearRoster()">清除</button>
       <button class="btn sm h30" onclick="W.editStudent()">+ 添加</button>
     </div>
     <div class="tbl-scroll">
       <table class="tbl roster"><thead><tr>${cols.map(c=>c.k?sortTh(c.k,c.t,c.c):`<th class="${c.c}">${c.t}</th>`).join("")}</tr></thead>
       <tbody>${rosterRows(cols)}</tbody></table>
     </div>
+    ${rosterHistHtml()}
   </div>`;
 }
+/* 名册历史（折叠） */
+function rosterHistHtml(){
+  const hist=Array.isArray(S.rosterHistory)?S.rosterHistory:[];
+  if(!hist.length)return "";
+  const rows=hist.map(r=>`<div class="grp-box" style="margin-bottom:6px"><div style="min-width:0;flex:1"><b>${esc(r.name||"名册")}</b>
+    <div class="tiny muted">${esc(r.time||"")} · ${(r.students||[]).length} 人</div></div>
+    <button class="btn ghost sm" onclick="W.restoreRosterHist('${r.id}')" title="当前名册替换为这份名单">恢复</button>
+    <button class="btn danger sm" onclick="W.delRosterHist('${r.id}')">删</button></div>`).join("");
+  return `<details class="collapse" style="margin-top:12px"><summary class="section-title" style="margin:0">历史名册（${hist.length}）<span class="chev">▶</span></summary>
+    <div style="margin-top:10px">${rows}</div></details>`;
+}
+/* 清空当前学生及学生维度数据（名册归档/清除共用） */
+function clearRosterData(){
+  S.students=[];
+  S.groups=[];
+  S.points={scores:{},logs:[]};
+  S.behaviors=[];
+  if(S.lottery)S.lottery.drawn=[];
+}
+W.archiveRoster=()=>{
+  if(!S.students.length){toast("名册为空");return;}
+  if(!confirm("归档当前名册（"+S.students.length+" 人）？名单存入「历史名册」，当前名册及学生相关积分/行为记录将清空。"))return;
+  if(!Array.isArray(S.rosterHistory))S.rosterHistory=[];
+  S.rosterHistory.unshift({id:uid(),name:"名册 "+nowStr(),time:nowStr(),
+    students:JSON.parse(JSON.stringify(S.students)),groups:JSON.parse(JSON.stringify(S.groups||[]))});
+  clearRosterData();
+  save();rosterKw="";viewRoster(document.getElementById("view"));
+  toast("已归档，可在下方「历史名册」查看");
+};
+W.restoreRosterHist=id=>{
+  const r=(S.rosterHistory||[]).find(x=>x.id===id);
+  if(!r){toast("记录不存在");return;}
+  if(S.students.length&&!confirm("恢复将替换当前名册（"+S.students.length+" 人），继续？"))return;
+  S.students=JSON.parse(JSON.stringify(r.students||[]));
+  S.groups=JSON.parse(JSON.stringify(r.groups||[]));
+  save();refresh();toast("已恢复「"+(r.name||"名册")+"」");
+};
+W.delRosterHist=id=>{
+  const r=(S.rosterHistory||[]).find(x=>x.id===id);
+  if(!r)return;
+  if(!confirm("删除历史名册「"+(r.name||"名册")+"」？"))return;
+  S.rosterHistory=S.rosterHistory.filter(x=>x.id!==id);
+  save();viewRoster(document.getElementById("view"));toast("已删除");
+};
+W.clearRoster=()=>{
+  if(!S.students.length){toast("名册已为空");return;}
+  if(!confirm("清除全部学生（"+S.students.length+" 人）？学生相关积分/行为记录一并清空，不可恢复。"))return;
+  clearRosterData();
+  save();rosterKw="";viewRoster(document.getElementById("view"));
+  toast("已清除全部学生");
+};
 /* 家长电话：点击直接拨号（手机端 tel: 唤起拨号，桌面端可交给已关联的拨号应用） */
 function phoneHref(p){return "tel:"+String(p||"").replace(/[^\d+*#]/g,"");}
 /* 家长电话支持多个：逗号 / 分号 / 顿号 / 斜杠 / 空格 分隔 */
@@ -3489,6 +3546,7 @@ W.manageTerms=()=>{
       <button onclick="W.toggleTermArchived('${t.id}')">${t.archived?"取消归档":"归档"}</button>
       <button onclick="W.pickTerm('${t.id}')" title="把积分页范围切到这个学期">用</button>
       <button class="del" onclick="W.delTerm('${t.id}')" title="删除学期及该时间范围内的数据">删</button>
+      <button onclick="W.editTerm('${t.id}')" title="改名称 / 起止日期">改</button>
     </span></div>`).join("")||`<div class="empty">还没有学期</div>`;
   openModal(`<h3>学期管理</h3>
     <div class="tiny muted" style="margin:-8px 0 10px">归档不影响任何数据；删除学期会连同学期时间范围内的行为、积分、考试、事务等数据一起删除。</div>
@@ -3513,6 +3571,25 @@ W.addTerm=()=>{
   if(s>e){toast("开始日期不能晚于结束日期");return;}
   S.terms.push({id:uid(),name:name.trim(),start:s,end:e,archived:false});
   save();W.manageTerms();refresh();
+};
+W.editTerm=id=>{
+  const t=el(id,S.terms||[]);if(!t)return;
+  openModal(`<h3>修改学期</h3>
+    <div class="field"><label class="lbl">名称</label><input class="fld" id="et_name" value="${esc(t.name)}"></div>
+    <div class="field row" style="align-items:flex-end">
+      <div style="flex:1;min-width:0"><label class="lbl">开始</label><input class="fld" type="date" id="et_s" value="${esc(t.start||"")}" style="min-width:0"></div>
+      <div style="flex:1;min-width:0"><label class="lbl">结束</label><input class="fld" type="date" id="et_e" value="${esc(t.end||"")}" style="min-width:0"></div>
+    </div>
+    <div class="foot"><button class="btn ghost" onclick="W.manageTerms()">取消</button><button class="btn" onclick="W.saveTerm('${t.id}')">保存</button></div>`);
+};
+W.saveTerm=id=>{
+  const t=el(id,S.terms||[]);if(!t)return;
+  const name=((document.getElementById("et_name")||{}).value||"").trim();
+  const s=(document.getElementById("et_s")||{}).value||"",e=(document.getElementById("et_e")||{}).value||"";
+  if(!name){toast("请填学期名称");return;}
+  if(s&&e&&s>e){toast("开始日期不能晚于结束日期");return;}
+  t.name=name;t.start=s;t.end=e;
+  save();W.manageTerms();refresh();toast("已保存");
 };
 W.toggleTermArchived=id=>{
   const t=el(id,S.terms||[]);if(!t)return;
@@ -4288,6 +4365,11 @@ function nowLocal(){const d=new Date();const p=n=>n.toString().padStart(2,"0");r
 const CLOUD_KEY="tw_cloud";
 const GH_API="https://api.github.com";
 let cloudBusy=false,cloudTimer=null,cloudReady=false;
+/* 冲突判断基线说明：判断「本地数据新还是云端新」绝不能用 S._savedAt——
+   任何一次本地 save()（含启动渲染、误触、离线编辑）都会把它刷成当前时间，
+   旧设备的本地数据就会误判为「更新」而上传覆盖云端，另一台设备的新改动丢失。
+   改用 cfg.baseAt：记录本设备数据所基于的云端版本号，只随成功的云端拉取/上传更新，
+   本地 save() 永远碰不到它。baseAt < 云端 _savedAt ⇒ 云端有本机没见过的更新 ⇒ 采用云端。 */
 
 function cloudCfg(){try{return JSON.parse(localStorage.getItem(CLOUD_KEY))||{};}catch(e){return {};}}
 function cloudCfgSave(o){localStorage.setItem(CLOUD_KEY,JSON.stringify(o));}
@@ -4331,6 +4413,14 @@ async function cloudPushNow(){
   cloudBusy=true;cloudStatus("","同步中…");
   try{
     const r=await cloudPullRemote(c);
+    /* 冲突防护：云端存在本机没见过的更新（如电脑端刚保存的新数据）→ 不上传，改采用云端，
+       本机数据先备份到 KEY_bak，避免旧数据覆盖新数据 */
+    const remoteAt=(r.data&&r.data._savedAt)||0;
+    if(!r.empty&&remoteAt>(c.baseAt||0)){
+      cloudStatus("","云端有更新，采用云端…");
+      await adoptRemoteData(r);
+      return "adopted";
+    }
     S._savedAt=Date.now();
     localStorage.setItem(KEY,JSON.stringify(S));
     const body=JSON.stringify({message:"sync "+new Date().toISOString(),content:cB64(JSON.stringify(S)),branch:c.branch||"main",sha:r.sha||undefined});
@@ -4339,7 +4429,7 @@ async function cloudPushNow(){
     if(up.status===403)throw new Error("令牌权限不足（需 Contents 读写）");
     if(up.status===409)throw new Error("写入冲突，请重试");
     if(!up.ok)throw new Error("HTTP "+up.status);
-    const cfg=cloudCfg();cfg.lastSync=Date.now();cloudCfgSave(cfg);
+    const cfg=cloudCfg();cfg.lastSync=Date.now();cfg.baseAt=S._savedAt;cloudCfgSave(cfg);
     cloudStatus("ok","已同步 "+new Date().toLocaleTimeString());
     cloudReady=true;
     return true;
@@ -4352,30 +4442,42 @@ function schedulePush(){
   if(cloudTimer)clearTimeout(cloudTimer);
   cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPushNow();},700);
 }
+async function adoptRemoteData(r){
+  const hasLocal=!!localStorage.getItem(KEY);
+  if(hasLocal&&!S._demo){try{localStorage.setItem(KEY+"_bak",JSON.stringify(S));}catch(e){}}
+  S=Object.assign(def(),r.data);
+  localStorage.setItem(KEY,JSON.stringify(S));
+  const cfg=cloudCfg();cfg.lastSync=Date.now();cfg.baseAt=(r.data&&r.data._savedAt)||0;cloudCfgSave(cfg);
+  cloudReady=true;cloudStatus("ok","已从云端载入");route();
+}
+let bootRetryT=null;
 async function bootCloudSync(){
   const c=cloudCfg();
   if(!cloudReadyEnough(c)){cloudReady=true;return;}
   cloudReady=false;cloudStatus("","连接云端…");
+  if(bootRetryT){clearTimeout(bootRetryT);bootRetryT=null;}
   try{
     const r=await cloudPullRemote(c);
-    const hasLocal=!!localStorage.getItem(KEY);
     if(r.empty){
       cloudReady=true;
-      if(hasLocal&&!S._demo){cloudStatus("","首次上传…");await cloudPushNow();}
+      if(!!localStorage.getItem(KEY)&&!S._demo){cloudStatus("","首次上传…");await cloudPushNow();}
       else cloudStatus("ok","已连接（云端暂无数据）");
       return;
     }
-    const remoteAt=(r.data&&r.data._savedAt)||0,localAt=S._savedAt||0;
-    /* 本地为空 / 是示例数据 / 云端更新 → 采用云端；采用前先把本地存一份备份，留恢复后路 */
-    if(!hasLocal||S._demo||remoteAt>localAt){
-      if(hasLocal&&!S._demo){try{localStorage.setItem(KEY+"_bak",JSON.stringify(S));}catch(e){}}
-      S=Object.assign(def(),r.data);
-      localStorage.setItem(KEY,JSON.stringify(S));
-      const cfg=cloudCfg();cfg.lastSync=Date.now();cloudCfgSave(cfg);
-      cloudReady=true;cloudStatus("ok","已从云端载入");route();return;
+    const remoteAt=(r.data&&r.data._savedAt)||0;
+    /* 本地为空 / 是示例数据 / 云端比本地基线新 → 采用云端；否则上传本地。
+       新旧判断用 cfg.baseAt（上次成功同步的云端版本），不用会被本地 save 刷新的 S._savedAt */
+    if(!localStorage.getItem(KEY)||S._demo||remoteAt>(c.baseAt||0)){
+      await adoptRemoteData(r);return;
     }
+    if(remoteAt<(c.baseAt||0)){const cfg=cloudCfg();cfg.baseAt=remoteAt;cloudCfgSave(cfg);}
     cloudReady=true;cloudStatus("","上传本地…");await cloudPushNow();
-  }catch(e){cloudReady=true;cloudStatus("err","连接失败："+cloudErr(e));}
+  }catch(e){
+    cloudStatus("err","连接失败："+cloudErr(e));
+    /* 拉取失败时保持 cloudReady=false：本地改动只留在本地，绝不盲目上传覆盖云端；
+       20 秒后自动重试，也可在数据页手动「立即同步」 */
+    if(!bootRetryT)bootRetryT=setTimeout(()=>{bootRetryT=null;bootCloudSync();},20000);
+  }
 }
 async function cloudSyncNow(){
   await bootCloudSync();
@@ -4515,6 +4617,8 @@ function init(){
   $("#moreDrawer").onclick=e=>{if(e.target.id==="moreDrawer")$("#moreDrawer").classList.remove("show");};
   $("#mask").onclick=e=>{if(e.target.id==="mask")closeModal();};
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+  /* 切后台/锁屏/关页前，把防抖中尚未上传的改动立即推上云端，避免「改完马上关页」丢同步 */
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;cloudPushNow();}});
   window.addEventListener("hashchange",route);
   route();
   bootCloudSync();/* 已启用云端同步时，启动即拉取云端最新数据 */
