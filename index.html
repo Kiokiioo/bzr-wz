@@ -405,6 +405,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .sched .cell.today{background:var(--brand-soft)}
 .sched .cell .sub{font-weight:700;font-size:12.5px;white-space:nowrap;align-self:center}
 .sched .cell .tch{color:var(--ink-2);font-size:11px;white-space:nowrap;align-self:center}
+.sched .cell .wtag{font-style:normal;font-weight:700;font-size:9px;line-height:1;padding:2px 4px;border-radius:5px;background:var(--brand-soft);color:var(--brand-ink);margin-right:3px;vertical-align:1px}
 .sched .cell .btns{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:3px;width:fit-content;align-self:center}
 .cell-phone{flex:none;width:22px;height:20px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--brand-ink);font-size:12px;line-height:1;display:inline-grid;place-items:center;cursor:pointer;opacity:.7;transition:opacity .12s,border-color .12s,color .12s;text-decoration:none}
 .cell-phone:hover{opacity:1;border-color:var(--brand);color:var(--brand)}
@@ -2196,8 +2197,15 @@ function viewSchedule(v){
   const cellHtml=(d,p,today)=>{
     const c=S.schedule.cells[d+"-"+p];
     const add=`<button class="cell-add" title="${c?"修改这一格":"添加课程"}" onclick="W.editCell('${d}','${p}')">${c?"✎":"+"}</button>`;
-    const phone=c&&c.tel?`<a class="cell-phone" href="tel:${esc(c.tel)}" title="拨打 ${esc(c.tch||"任课老师")} ${esc(c.tel)}">☎</a>`:"";
-    return `<div class="cell ${today?'today':''}" style="border-left-color:${subjColor(c&&c.sub)}">${c?`<div class="sub"><span>${esc(c.sub)}</span></div>${c.tch?`<div class="tch">${esc(c.tch)}</div>`:""}<div class="btns">${add}${phone}</div>`:add}</div>`;
+    const first=c&&(c.o||c.e)?(c.o||c.e):c;
+    const phone=first&&first.tel?`<a class="cell-phone" href="tel:${esc(first.tel)}" title="拨打 ${esc(first.tch||"任课老师")} ${esc(first.tel)}">☎</a>`:"";
+    /* 单双周分列：每门课一行，带「单/双」小标，点课程名可直接编辑该侧 */
+    const body=cellEntries(c).map(([w2,cc])=>{
+      const tag=w2?`<i class="wtag">${w2==="o"?"单":"双"}</i>`:"";
+      const tap=w2?` style="cursor:pointer" title="${wName(w2)}，点按编辑" onclick="W.editCell('${d}','${p}','${w2}')"`:"";
+      return `<div class="sub"${tap}><span>${tag}${esc(cc.sub)}</span></div>${cc.tch?`<div class="tch">${esc(cc.tch)}</div>`:""}`;
+    }).join("");
+    return `<div class="cell ${today?'today':''}" style="border-left-color:${subjColor(first&&first.sub)}">${body}<div class="btns">${add}${phone}</div></div>`;
   };
   /* 节次行：行首「第N节」+ 该节次上课时间 */
   const pRow=(p,label,timeStr)=>{
@@ -3832,20 +3840,29 @@ W.clearPunLogs=()=>{
   if(!confirm("清空全部惩罚记录？"))return;
   S.lottery.punLogs=[];save();viewLottery(document.getElementById("view"));
 };
-W.editCell=(d,p)=>{const c=S.schedule.cells[d+"-"+p]||{};const pl=periodLabel(p);
-  openModal(`<h3>${esc(pl)} · ${DAYS.find(x=>x[0]===d)[1]}</h3>
-  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">科目</label><input class="fld" id="m_cs" value="${esc(c.sub||"")}"></div>
-    <div style="flex:1;min-width:0"><label class="lbl">班级</label><input class="fld" id="m_cc" value="${esc(c.cls||"")}"></div></div>
-  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">授课老师</label><input class="fld" id="m_ct" value="${esc(c.tch||"")}"></div>
-    <div style="flex:1;min-width:0"><label class="lbl">联系方式</label><input class="fld" id="m_cn" value="${esc(c.tel||"")}"></div></div>
-  ${timeFields("m_c1","m_c2",periodTime(p))}
-  <div class="tiny muted">上课时间按节次统一保存，改一次即应用到这一天的同一节次。</div>
-  <div class="foot"><button class="btn danger ghost" onclick="W.clearCell('${d}','${p}')">清除</button><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveCell('${d}','${p}')">保存</button></div>`);};
-W.saveCell=(d,p)=>{const sub=$("#m_cs").value.trim();if(!sub){W.clearCell(d,p);return;}
-  S.schedule.cells[d+"-"+p]={sub,cls:$("#m_cc").value.trim(),tch:$("#m_ct").value.trim(),tel:$("#m_cn").value.trim()};
-  setPeriodTime(p,readTime("m_c1","m_c2"));
+/* 编辑一格：w="o"/"e" 时只编辑单/双周那一侧；周次切换后按目标侧写入 */
+const wSelHtml=sel=>`<div style="flex:1;min-width:0"><label class="lbl">周次</label><select class="fld" id="m_cw"><option value=""${!sel?" selected":""}>每周</option><option value="o"${sel==="o"?" selected":""}>单周</option><option value="e"${sel==="e"?" selected":""}>双周</option></select></div>`;
+W.editCell=(d,p,w)=>{
+  const c=S.schedule.cells[d+"-"+p];
+  const ent=w==="o"?(c&&c.o):w==="e"?(c&&c.e):(c&&!c.o&&!c.e?c:{})||{};
+  openModal(`<h3>${esc(periodLabel(p))} · ${DAYS.find(x=>x[0]===d)[1]}${w?` · ${wName(w)}`:""}</h3>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">科目</label><input class="fld" id="m_cs" value="${esc(ent.sub||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">班级</label><input class="fld" id="m_cc" value="${esc(ent.cls||"")}"></div></div>
+  <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">授课老师</label><input class="fld" id="m_ct" value="${esc(ent.tch||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">联系方式</label><input class="fld" id="m_cn" value="${esc(ent.tel||"")}"></div></div>
+  <div class="field row" style="align-items:flex-end">${wSelHtml(w)}<div style="flex:1;min-width:0"><label class="lbl">开始时间</label><input class="fld" type="time" id="m_c1" value="${esc(periodTime(p).s||"")}"></div>
+    <div style="flex:1;min-width:0"><label class="lbl">结束时间</label><input class="fld" type="time" id="m_c2" value="${esc(periodTime(p).e||"")}"></div></div>
+  <div class="tiny muted">单双周可各排一门课：同一格另一侧的课程会保留；改成「每周」会覆盖整格。</div>
+  <div class="foot"><button class="btn danger ghost" onclick="W.clearCell('${d}','${p}','${w||""}')">清除</button><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveCell('${d}','${p}','${w||""}')">保存</button></div>`);};
+W.saveCell=(d,p,w)=>{
+  const sub=$("#m_cs").value.trim();
+  if(!sub){removeCell(d,p,w);setPeriodTimeFromModal(p);save();closeModal();refresh();return;}
+  const course={sub,cls:$("#m_cc").value.trim(),tch:$("#m_ct").value.trim(),tel:$("#m_cn").value.trim()};
+  putCell(d,p,course,$("#m_cw").value);
+  setPeriodTimeFromModal(p);
   save();closeModal();refresh();};
-W.clearCell=(d,p)=>{delete S.schedule.cells[d+"-"+p];save();closeModal();refresh();};
+W.clearCell=(d,p,w)=>{removeCell(d,p,w);save();closeModal();refresh();};
+function setPeriodTimeFromModal(p){setPeriodTime(p,readTime("m_c1","m_c2"));}
 /* 早自习=m / 晚自习=e 的显示名与配置读写 */
 function periodLabel(p){return p==="m"?"早自习":p==="e1"?"晚自习一":p==="e2"?"晚自习二":p==="e3"?"晚自习三":"第"+p+"节";}
 function periodTime(p){return ((S.schedule.times||{})[p])||{s:"",e:""};}
@@ -3854,6 +3871,33 @@ function setPeriodTime(p,t){
   if(t.s||t.e)S.schedule.times[p]=t; else delete S.schedule.times[p];
 }
 /* 早 / 晚自习已并入「节次」下拉（periodOptions），有课即显示，不再单独开关 */
+/* ---- 单双周 ----
+   格子两种形态：普通课程 {sub,cls,tch,tel}（每周）；单双周分列 {o:{...},e:{...}}（o=单周、e=双周，两侧可缺）。
+   w 参数："" = 每周（覆盖整格）；"o"/"e" = 只写单/双侧，另一侧原有课程保留。 */
+function cellEntries(c){
+  if(!c)return [];
+  if(c.o||c.e){const a=[];if(c.o)a.push(["o",c.o]);if(c.e)a.push(["e",c.e]);return a;}
+  return [["",c]];
+}
+function putCell(d,p,course,w){
+  const key=d+"-"+p;
+  if(!w){S.schedule.cells[key]=course;return;}
+  const cur=S.schedule.cells[key];
+  const split=cur&&(cur.o||cur.e);
+  const o=w==="o"?course:(split?cur.o:null);
+  const e=w==="e"?course:(split?cur.e:null);
+  const nv={};if(o)nv.o=o;if(e)nv.e=e;
+  if(nv.o||nv.e)S.schedule.cells[key]=nv;else delete S.schedule.cells[key];
+}
+/* 清除一格：w 为空删整格；w="o"/"e" 只删该侧（另一侧保留），两侧都空则删整格 */
+function removeCell(d,p,w){
+  const key=d+"-"+p,cur=S.schedule.cells[key];
+  if(!cur)return;
+  if(!w||!(cur.o||cur.e)){delete S.schedule.cells[key];return;}
+  const nv={};if(w!=="o"&&cur.o)nv.o=cur.o;if(w!=="e"&&cur.e)nv.e=cur.e;
+  if(nv.o||nv.e)S.schedule.cells[key]=nv;else delete S.schedule.cells[key];
+}
+const wName=w=>w==="o"?"单周":w==="e"?"双周":"每周";
 W.clearSchedule=()=>{if(!confirm("清空整张课表？"))return;S.schedule.cells={};save();viewSchedule(document.getElementById("view"));};
 /* ---- 课表记录：把当前课表保存为历史快照，可恢复 / 删除（逻辑同排位记录） ----
    快照内容 = S.schedule 全量（cells 课程 + times 各节次上课时间）。 */
@@ -3911,16 +3955,19 @@ function dayKey(s){
   const c=s.replace(/^周/,"").replace(/^星期/,"")[0];
   return map[c]?String(map[c]):null;
 }
-/* 课表导出：星期,节次,上课时间,科目,班级,授课老师,联系方式（早/晚自习的节次写作「早自习」「晚自习」） */
+/* 课表导出：星期,节次,上课时间,科目,班级,授课老师,联系方式,周次（早/晚自习的节次写作「早自习」「晚自习」；单双周分列格导出为两行） */
 function schedText(){
-  let t="星期,节次,上课时间,科目,班级,授课老师,联系方式\n";
-  const line=(d,pl,c,tm)=>{t+=[d,pl,tm,c.sub||"",c.cls||"",c.tch||"",c.tel||""].join(",")+"\n";};
+  let t="星期,节次,上课时间,科目,班级,授课老师,联系方式,周次\n";
+  const line=(d,pl,c,tm,w)=>{t+=[d,pl,tm,c.sub||"",c.cls||"",c.tch||"",c.tel||"",wName(w)].join(",")+"\n";};
   DAYS.forEach(d=>{
-    ["m","e1","e2","e3"].forEach(k=>{const c=S.schedule.cells[d[0]+"-"+k];if(c)line(d[1],periodLabel(k),c,tRange((S.schedule.times||{})[k]||{}));});
-    for(let p=1;p<=effectivePeriods();p++){
-      const c=S.schedule.cells[d[0]+"-"+p];if(!c)continue;
-      line(d[1],p,c,tRange(S.schedule.times[p]));
-    }});
+    const emit=(k,label,tm)=>{
+      const c=S.schedule.cells[d[0]+"-"+k];if(!c)return;
+      if(c.o||c.e){if(c.o)line(d[1],label,c.o,tm,"o");if(c.e)line(d[1],label,c.e,tm,"e");}
+      else line(d[1],label,c,tm,"");
+    };
+    ["m","e1","e2","e3"].forEach(k=>emit(k,periodLabel(k),tRange((S.schedule.times||{})[k]||{})));
+    for(let p=1;p<=effectivePeriods();p++)emit(p,p,tRange(S.schedule.times[p]));
+  });
   return t;
 }
 /* 节次下拉选项：早自习 / 晚自习一·二·三 列在首尾，有课才显示对应行 */
@@ -3936,25 +3983,27 @@ function periodOptions(sel){
 W.addSchedule=()=>{
   openModal(`<h3>添加课程</h3>
   <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">星期</label><select class="fld" id="m_sd">${DAYS.map(d=>`<option value="${d[0]}">${d[1]}</option>`).join("")}</select></div>
-    <div style="flex:1;min-width:0"><label class="lbl">节次</label><select class="fld" id="m_sp">${periodOptions(1)}</select></div></div>
+    <div style="flex:1;min-width:0"><label class="lbl">节次</label><select class="fld" id="m_sp">${periodOptions(1)}</select></div>
+    ${wSelHtml("")}</div>
   <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">科目 *</label><input class="fld" id="m_ss"></div>
     <div style="flex:1;min-width:0"><label class="lbl">班级</label><input class="fld" id="m_sc"></div></div>
   <div class="field row" style="align-items:flex-end"><div style="flex:1;min-width:0"><label class="lbl">授课老师</label><input class="fld" id="m_st"></div>
     <div style="flex:1;min-width:0"><label class="lbl">联系方式</label><input class="fld" id="m_sn"></div></div>
   ${timeFields("m_s1","m_s2",periodTime(1))}
-  <div class="tiny muted">已占用的格子会被覆盖；也可以直接点课表格子填写。上课时间按节次统一保存。</div>
+  <div class="tiny muted">已占用的格子会被覆盖；选单周/双周时保留同一格另一侧的课程。也可以直接点课表格子填写。</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doAddSchedule()">保存</button></div>`);
 };
 W.doAddSchedule=()=>{
   const sub=$("#m_ss").value.trim();if(!sub){toast("请填科目");return;}
-  const p=$("#m_sp").value;
-  S.schedule.cells[$("#m_sd").value+"-"+p]={sub,cls:$("#m_sc").value.trim(),tch:$("#m_st").value.trim(),tel:$("#m_sn").value.trim()};
+  const p=$("#m_sp").value,w=$("#m_cw").value;
+  putCell($("#m_sd").value,p,{sub,cls:$("#m_sc").value.trim(),tch:$("#m_st").value.trim(),tel:$("#m_sn").value.trim()},w);
   setPeriodTime(p,readTime("m_s1","m_s2"));
-  save();closeModal();viewSchedule(document.getElementById("view"));toast("已添加");
+  save();closeModal();viewSchedule(document.getElementById("view"));
+  toast("已添加"+(w==="o"?"（单周）":w==="e"?"（双周）":""));
 };
 W.exportSchedule=()=>{
   openModal(`<h3>导出课表</h3>
-  <div class="tiny muted" style="margin-bottom:6px">格式：星期,节次,上课时间,科目,班级,授课老师,联系方式（每行一节课，可复制或下载 CSV；上课时间可留空，早自习节次写作「早自习」、晚自习写作「晚自习一 / 晚自习二 / 晚自习三」）</div>
+  <div class="tiny muted" style="margin-bottom:6px">格式：星期,节次,上课时间,科目,班级,授课老师,联系方式,周次（每行一节课，可复制或下载 CSV；上课时间可留空，早自习节次写作「早自习」、晚自习写作「晚自习一 / 晚自习二 / 晚自习三」；周次可写 单周 / 双周，留空为每周）</div>
   <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(schedText())}</textarea>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn ghost" onclick="W.downloadIO('课表')">下载 CSV</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
 };
@@ -3992,7 +4041,10 @@ function applySchedText(txt){
     if(c.length>=4){tm=c[2]||"";sub=c[3];}
     else{sub=c[2];}
     if(!sub){bad++;return;}
-    S.schedule.cells[d+"-"+p]={sub,cls:c[4]||"",tch:c[5]||"",tel:c[6]||""};
+    /* 周次（第8列，可选）：单周→o / 双周→e / 空·每周→整格覆盖 */
+    const wRaw=c[7]||"";
+    const w=wRaw==="单周"?"o":wRaw==="双周"?"e":"";
+    putCell(d,p,{sub,cls:c[4]||"",tch:c[5]||"",tel:c[6]||""},w);
     if(tm){const x=tm.split(/\s*[-–~至]\s*/);setPeriodTime(p,{s:x[0]||"",e:x[1]||""});}
     n++;
   });
