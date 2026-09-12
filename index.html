@@ -40,6 +40,7 @@ body{
   touch-action:manipulation;/* 关闭双击缩放：iOS 上双击会整页放大 */
 }
 a,button,input,select,textarea,label{touch-action:manipulation}
+*{-webkit-tap-highlight-color:transparent}/* 手机点按链接/按钮不再闪半透明黑块 */
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit;font-size:14px}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -596,7 +597,7 @@ function def(){
     /* 课表：cells 键 "周几-节次"（节次为数字 1..12；早自习=m，晚自习=e）
        times[p]={s,e} 每节次上课时间（含 m / e 早、晚自习）；早/晚自习行「有课时」才显示，位置在首/尾 */
     schedule:{cells:{},times:{}},
-    tierCfg:{gw:50,pw:30,hw:20,gradeRange:1,pointRange:"all",subjW:{}},theme:"light",
+    tierCfg:{gw:50,pw:30,hw:20,gradeRange:"all",pointRange:"all",subjW:{}},theme:"light",
     /* 学期：{id,name,start,end,archived} —— 归档的学期不出现在积分页时间选项中 */
     terms:[],
     /* 班级工作：职务 + 周期自动加分。{id,name,cycle:'day'|'week',pts,studentIds:[]} */
@@ -1714,7 +1715,7 @@ function viewSeating(v){
         const z=S.seatZones[i];const fx=S.seatFixed[i];
         const trk=seatColTrack[c];
         h+=`<div class="seat ${st?"filled":""} ${z?"zone-"+z:""} ${fx?"fixed":""} ${zoneBrush?"markable":""}" data-idx="${i}" draggable="${st&&!zoneBrush&&!fx?"true":"false"}" ondragstart="W.dragStart(event,${i})" ondragover="event.preventDefault()" ondrop="W.dropSeat(event,${i})" ${zoneBrush?`onclick="W.paintZone(${i})"`:""} ondragenter="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" style="grid-column:${trk};grid-row:${rtr}">
-        ${st?`<div>${esc(st.name)}</div><div class="no">${esc(st.no)}号</div>`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}</div>`;
+        ${st?`<div>${esc(st.name)}</div>`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}</div>`;
         /* 大组之间插入列分隔条：位置按末列轨道查表（左/右模式偏移不同）。
            跨大组合并：该排带内 gi 与 gi+1 的学习组属同一合并段 → 竖虚线消失（合并忽略大组规则）。 */
         if(sepTrackOf[trk]){
@@ -1919,11 +1920,11 @@ function viewSeating(v){
 /* 权重设置 / 计算规则说明 的展开状态：仅会话内记忆（改参数重渲染不收起），刷新页面后默认折叠 */
 let tierWOpen=false,tierRuleOpen=false;
 function viewTiers(v){
-  if(!S.tierCfg)S.tierCfg={gw:50,pw:30,hw:20,gradeRange:1,pointRange:"all",subjW:{}};
+  if(!S.tierCfg)S.tierCfg={gw:50,pw:30,hw:20,gradeRange:"all",pointRange:"all",subjW:{}};
   if(S.tierCfg.gw===undefined)S.tierCfg.gw=50;
   if(S.tierCfg.pw===undefined)S.tierCfg.pw=30;
   if(S.tierCfg.hw===undefined)S.tierCfg.hw=20;
-  if(S.tierCfg.gradeRange===undefined)S.tierCfg.gradeRange=1;
+  if(S.tierCfg.gradeRange===undefined)S.tierCfg.gradeRange="all";
   if(S.tierCfg.pointRange===undefined)S.tierCfg.pointRange="all";
   const {exams:selExams,rows}=computeTiers();save();
   const BC={A:"ok",B:"warn",C:"bad"};/* 与排位/名册保持一致：A 绿 / B 琥珀 / C 红 */
@@ -3902,99 +3903,155 @@ W.setManual=(id,t)=>{
   if((location.hash||"#home")==="#tiers")viewTiers(document.getElementById("view"));
 };
 
-W.seatIO=k=>{
-  openModal(`<h3>${k==="import"?"导入":"导出"}</h3>
-  <div class="tiny muted" style="margin-bottom:10px">选择要${k==="import"?"导入":"导出"}的内容（均为 CSV 文件）</div>
-  <div style="display:flex;flex-direction:column;gap:8px">
-    <button class="btn" style="width:100%" onclick="W.${k}Zones()">座位等级排位（ABC 区域 + 固定）</button>
-    <button class="btn ghost" style="width:100%" onclick="W.${k}Tiers()">学生等级（名单）</button>
-  </div>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button></div>`);
-};
-const zoneText=()=>{
+/* ---- 排座 导入/导出（合一） ----
+   导出网格：首行 R排,C列；每座两格 —— 有人「姓名(!),等级」、空座「区域或-(!),空」；! 为固定座。
+   网格后附学习组结构行（大组/学习组/第0排/合并），导入整体还原到具体学习组。
+   导入自动识别：有 R,C 头 → 网格（座次+等级+区域+学习组，有哪部分导哪部分）；无头 → 按「姓名,等级」名单只导等级。 */
+const csvField=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+const seatText=()=>{
   const cfg=S.seatCfg;
-  const zones=S.seatZones||[],fixed=S.seatFixed||[];
+  const zones=S.seatZones||[],fixed=S.seatFixed||[],seating=S.seating||[];
   const nRows=cfg.rows+(cfg.row0?1:0);
-  const cell=i=>{const z=zones[i];let s=z||"-";if(fixed[i])s+="!";return s;};
   const lines=["R"+nRows+",C"+cfg.cols];
-  for(let r=0;r<nRows;r++){const row=[];for(let c=0;c<cfg.cols;c++)row.push(cell(r*cfg.cols+c));lines.push(row.join(","));}
+  for(let r=0;r<nRows;r++){
+    const row=[];
+    for(let c=0;c<cfg.cols;c++){
+      const i=r*cfg.cols+c;
+      const sid=seating[i];const st=sid?el(sid,S.students):null;
+      const fx=fixed[i]?"!":"";
+      if(st){
+        const t=tierOf(st);
+        row.push(csvField(st.name)+fx+","+(/^[ABC]$/.test(t)?t:""));
+      }else{
+        const z=zones[i];
+        row.push(((z&&/^[ABC]$/.test(z))?z:"-")+fx+",");
+      }
+    }
+    lines.push(row.join(","));
+  }
+  const bg=Array.isArray(cfg.bigGroups)&&cfg.bigGroups.length?cfg.bigGroups:[cfg.cols];
+  lines.push("大组:"+bg.join("-"));
+  lines.push("学习组:"+(cfg.studyGroup||cfg.rows));
+  lines.push("第0排:"+(cfg.row0?1:0));
+  const ms=(Array.isArray(cfg.studyMerges)?cfg.studyMerges:[]).filter(m=>m&&Array.isArray(m.tags)&&m.tags.length>=2);
+  if(ms.length)lines.push("合并:"+ms.map(m=>m.tags.join("+")+((m.name&&String(m.name).trim())?"="+String(m.name).trim():"")).join(";"));
   return lines.join("\n");
 };
-W.exportZones=()=>{
-  openModal(`<h3>导出座位等级排位</h3>
-  <div class="tiny muted" style="margin-bottom:6px">首行为尺寸（R排 C列），A/B/C 为区域，! 为固定座。</div>
-  <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre">${esc(zoneText())}</textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('座位等级排位')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
+W.seatIO=k=>{
+  if(k==="import"){
+    pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+      if(err){toast(err);return;}
+      if(!String(text||"").trim()){toast("内容为空");return;}
+      const r=applySeatText(text);
+      if(r===null){/* 无 R,C 头 → 「姓名,等级」名单：只导入等级 */
+        const t=applyTierText(text);save();
+        if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
+        toast("已导入等级名单："+t.done+" 人"+(t.miss?"，"+t.miss+" 行未匹配":""));return;
+      }
+      if(!r.ok){toast(r.msg);return;}
+      save();
+      if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
+      toast(r.msg);
+    }));
+    return;
+  }
+  openModal(`<h3>导出座次 + 等级</h3>
+  <div class="tiny muted" style="margin-bottom:6px">每座两格：有人「姓名,等级」、空座「区域或-」，! 为固定座；末尾大组/学习组/合并行还原学习组结构。导入自动识别本文件或纯等级名单。</div>
+  <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(seatText())}</textarea>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('排座导出')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
 };
 W.copyIO=()=>{const t=$("#m_io");t.focus();t.select();let done=false;try{done=document.execCommand("copy");}catch(e){}
   if(!done&&navigator.clipboard){navigator.clipboard.writeText(t.value).then(()=>toast("已复制")).catch(()=>toast("请手动复制"));return;}
   toast(done?"已复制":"请手动复制");};
-W.importZones=()=>{
-  openModal(`<h3>导入座位等级排位</h3>
-  <div class="tiny muted" style="margin-bottom:10px">选择之前导出的 CSV 文件（首行 R… C…，A/B/C 为区域，! 为固定座）。尺寸一致则保留现有座位安排，不一致会清空重排。</div>
-  <div class="field"><label class="lbl">选择 CSV 文件</label><input class="fld" type="file" id="m_file" accept=".csv,text/csv"></div>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applyZones()">导入</button></div>`);
-};
-/* 解析座位等级排位文本（兼容逗号 / 空格分隔）并写入；返回 {ok,msg}（纯函数） */
-function applySeatZoneText(txt){
+function splitCsvLine(line){
+  const out=[];let cur="",q=false;
+  for(let i=0;i<line.length;i++){const ch=line[i];
+    if(q){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}
+    else if(ch==='"')q=true;
+    else if(ch===","){out.push(cur);cur="";}
+    else cur+=ch;}
+  out.push(cur);return out;
+}
+/* 解析排座导出文本：返回 null=非网格（调用方按等级名单处理）；{ok,msg}=结果（除写入 s.tier 外不改学生数据） */
+function applySeatText(txt){
   const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   const head=lines.length?lines[0].replace(/\s*,\s*/g," ").match(/^R(\d+)\s+C(\d+)$/i):null;
-  if(!head)return {ok:false,msg:"格式无法识别（缺 R… C… 首行）"};
+  if(!head)return null;
   const rows=+head[1],cols=+head[2];
   if(rows<1||rows>12||cols<1||cols>12||lines.length<rows+1)return {ok:false,msg:"行列数超出范围或行数不足"};
-  const zones=[],fixed=[];
-  for(let r=0;r<rows;r++){
-    const cells=lines[r+1].split(/[\s,]+/).filter(x=>x!=="");
-    if(cells.length<cols)return {ok:false,msg:"第 "+(r+1)+" 行列数不足"};
-    for(let c=0;c<cols;c++){
-      const t=cells[c].toUpperCase();const f=t.endsWith("!");
-      const z=t.replace(/!+$/,"");
-      zones.push(["A","B","C"].includes(z)?z:null);fixed.push(f);
-    }
-  }
-  /* 行数与第0排匹配：开启时导入文本含第0排行（rows=cfg.rows+1）则保持；不含则视为无第0排 */
+  /* 第0排：导入行数 = 当前排数+1 → 含第0排；= 当前排数 → 不含 */
   let r0=!!S.seatCfg.row0;
   if(r0&&rows===S.seatCfg.rows){r0=false;}
   else if(!(r0&&rows===S.seatCfg.rows+1)){r0=false;}
-  const same=(rows===(S.seatCfg.rows+(r0?1:0)))&&cols===S.seatCfg.cols;
   S.seatCfg.rows=r0?rows-1:rows;S.seatCfg.cols=cols;S.seatCfg.row0=r0;
-  /* 列数变化时把大组列数缩放到新 cols（与 setSeatCfg('cols') 同规则） */
+  const total=rows*cols;
+  const zones=new Array(total).fill(null),fixed=new Array(total).fill(false);
+  const seat=new Array(total).fill(null);
+  let seated=0,tierSet=0,missName=0;
+  const place=(i,s)=>{for(let j=0;j<total;j++)if(seat[j]===s.id)seat[j]=null;seat[i]=s.id;};
+  for(let r=0;r<rows;r++){
+    const f=splitCsvLine(lines[r+1]);
+    const paired=f.length>=cols*2;
+    if(!paired&&f.length<cols)return {ok:false,msg:"第 "+(r+1)+" 行列数不足"};
+    for(let c=0;c<cols;c++){
+      const i=r*cols+c;
+      const v1=(f[paired?c*2:c]||"").trim();
+      const v2=paired?(f[c*2+1]||"").trim().toUpperCase():"";
+      const fx=/!$/.test(v1)||/!$/.test(v2);
+      const t1=v1.replace(/!+$/,""),t2=v2.replace(/!+$/,"");
+      if(paired&&t1&&t1!=="-"&&!/^[ABC]$/.test(t1)){/* 有人格：座次 + 等级 */
+        const s=S.students.find(x=>x.name===t1);
+        if(s){place(i,s);seated++;if(/^[ABC]$/.test(t2)){s.tier=t2;tierSet++;}}
+        else missName++;
+      }else{/* 空座格：区域写在任一格均可 */
+        zones[i]=(/^[ABC]$/.test(t1)?t1:(/^[ABC]$/.test(t2)?t2:null));
+      }
+      fixed[i]=fx;
+    }
+  }
+  /* 学习组结构行（可选，全部还原到具体学习组）；重复结构行以后者为准；第0排行优先，覆盖行数推断 */
+  const _r0s=lines.slice(rows+1).filter(L=>/^第0排[:：]/.test(L));
+  if(_r0s.length){const on=/:\s*1\s*$/.test(_r0s[_r0s.length-1]);S.seatCfg.row0=on;S.seatCfg.rows=Math.max(1,on?rows-1:rows);}
+  for(let li=rows+1;li<lines.length;li++){
+    const L=lines[li];let m;
+    if((m=L.match(/^大组[:：]\s*(.+)$/))){
+      const arr=m[1].split(/[-,，\s]+/).map(x=>parseInt(x,10)).filter(x=>x>0);
+      if(arr.length&&arr.reduce((a,b)=>a+b,0)===cols)S.seatCfg.bigGroups=arr;
+    }else if((m=L.match(/^学习组[:：]\s*(\d+)$/))){
+      S.seatCfg.studyGroup=Math.max(1,Math.min(S.seatCfg.rows,parseInt(m[1],10)||S.seatCfg.rows));
+    }else if(/^第0排[:：]/.test(L)){
+      /* 已在上方预扫描处理 */
+    }else if((m=L.match(/^合并[:：]\s*(.+)$/))){
+      const arr=[];
+      m[1].split(/[;；]/).forEach(seg=>{
+        seg=seg.trim();if(!seg)return;
+        let name="";const mi=seg.search(/[=＝]/);
+        if(mi>=0){name=seg.slice(mi+1).trim();seg=seg.slice(0,mi);}
+        const tags=seg.split(/[+＋]/).map(x=>x.trim()).filter(Boolean);
+        if(tags.length>=2)arr.push(name?{id:"m"+Date.now()+"_"+arr.length,tags,name}:{id:"m"+Date.now()+"_"+arr.length,tags});
+      });
+      S.seatCfg.studyMerges=arr;
+    }
+  }
+  /* 列数变化时把大组列数缩放到新 cols（与 setSeatCfg('cols') 同规则；文件带了合法大组行则已按文件） */
   {const _bg=Array.isArray(S.seatCfg.bigGroups)&&S.seatCfg.bigGroups.length?S.seatCfg.bigGroups:[Math.min(3,cols)];
    const _used=_bg.reduce((a,b)=>a+b,0);
    if(_used>cols){let acc=0;S.seatCfg.bigGroups=_bg.map(x=>{const remain=cols-acc;const v=Math.min(x,Math.max(0,remain));acc+=v;return v;}).filter(x=>x>0);if(!S.seatCfg.bigGroups.length)S.seatCfg.bigGroups=[cols];}
    else if(_used<cols){_bg[_bg.length-1]=(_bg[_bg.length-1]||0)+(cols-_used);S.seatCfg.bigGroups=_bg;}}
+  const oldZones=(Array.isArray(S.seatZones)&&S.seatZones.length===total)?S.seatZones:null;
+  if(oldZones){/* 有人格不携带区域信息 → 沿用原区域 */
+    for(let i=0;i<total;i++)if(seat[i]&&zones[i]===null)zones[i]=oldZones[i]||null;
+  }
+  /* 有人 → 座次按文件整表重建（文件里没有的学生不再就座）；纯区域网格 → 尺寸一致沿用原座次 */
+  const hasAny=seat.some(Boolean);
+  const keepSeating=!hasAny&&Array.isArray(S.seating)&&S.seating.length===total;
   S.seatZones=zones;S.seatFixed=fixed;
-  if(!same)S.seating=new Array((S.seatCfg.rows+(r0?1:0))*cols).fill(null);
-  return {ok:true,same:same};
+  S.seating=hasAny?seat:(keepSeating?S.seating:new Array(total).fill(null));
+  W.syncStudyGroups();
+  if(hasAny)return {ok:true,msg:"已导入座次+等级："+seated+" 人就座"+(tierSet?"，"+tierSet+" 人设等级":"")+(missName?"，"+missName+" 个姓名未匹配":"")};
+  return {ok:true,msg:"已导入座位区域（不含学生座次）"+(keepSeating?"":"，尺寸变化原座位已清空")};
 }
-W.applyZones=()=>{
-  readTextFile("m_file",(text,err)=>{
-    if(err){toast(err);return;}
-    const r=applySeatZoneText(text);
-    if(!r.ok){toast(r.msg);return;}
-    save();closeModal();
-    if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
-    toast("已导入座位等级排位"+(r.same?"":"（尺寸变化，座位安排已清空）"));
-  });
-};
-W.exportTiers=()=>{
-  const text="姓名,等级\n"+S.students.map(s=>esc(s.name)+","+(s.tier||"")).join("\n");
-  openModal(`<h3>导出学生等级</h3>
-  <div class="tiny muted" style="margin-bottom:6px">导出手动设定的等级（每行「姓名,等级」，空为按计算）；计算等级可由成绩/积分/身高数据随时重算。</div>
-  <textarea class="fld" id="m_io" rows="10" style="font-family:monospace;font-size:12px;white-space:pre">${text}</textarea>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('学生等级')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
-};
-W.importTiers=()=>{
-  /* 点击即弹出系统文件选择窗口 */
-  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
-    if(err){toast(err);return;}
-    if(!String(text||"").trim()){toast("内容为空");return;}
-    const r=applyTierText(text);
-    save();closeModal();
-    if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
-    toast("已更新 "+r.done+" 人等级"+(r.miss?"，"+r.miss+" 行未匹配":""));
-  }));
-};
+/* 等级名单的独立导入/导出入口已并入 seatIO：导出=座次网格自带等级；导入自动识别无 R,C 头的「姓名,等级」名单 */
 /* 解析「姓名,等级」文本并写入手动等级；返回 {done,miss}（纯函数） */
 function applyTierText(txt){
   const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -4861,12 +4918,21 @@ function fixExamRecordTime(){
   });
   if(dirty)save();
 }
+/* 一次性迁移：成绩范围默认值由「最近1次」改为「全部考试」；仅当仍为旧默认 1 时翻转，显式选过 2/3/all 的不动 */
+function migrateGradeRangeDefault(){
+  if(S.tierCfg&&S.tierCfg.gradeRange===1&&!S._gradeRangeMigrated){
+    S.tierCfg.gradeRange="all";
+    S._gradeRangeMigrated=true;
+    save();
+  }
+}
 function init(){
   /* 不再自动灌示例数据：空数据保持空白，需要示例时在「数据」页手动点「示例」 */
   migrateRedeemV2();
   migrateRedeemV3();
   fixGradeReason();/* 自动记分事由不再重复分值 */
   fixExamRecordTime();/* 成绩自动记分时间 = 考试日期：仅修正时间不一致的旧记录（幂等） */
+  migrateGradeRangeDefault();/* 成绩范围默认值：最近1次 → 全部考试 */
   buildNav();applyTheme();
   runJobAuto();/* 班级工作：周期末自动计入职务加分（幂等，不立即算分） */
   setInterval(()=>{runJobAuto();},60000);/* 页面开着时每 60 秒检查，命中周期末即自动记 */
