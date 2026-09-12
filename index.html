@@ -1138,11 +1138,14 @@ W.sortGrades=k=>{
 };
 function viewGrades(v){
   if(!S.exams.length){v.innerHTML=`<div class="card pad" style="text-align:center"><div class="empty"><div class="big">📊</div>还没有考试，先添加一场</div><button class="btn" onclick="W.newExam()" style="margin-top:10px">添加</button></div>`;return;}
-  if(!gradeExam||!el(gradeExam,S.exams))gradeExam=S.exams[0].id;
+  if(!gradeExam||!el(gradeExam,S.exams))gradeExam=latestExamId();/* 默认最近一次考试 */
   const ex=el(gradeExam,S.exams);
   const ranks=gradeRanks(ex);
-  const prev=prevExam(ex);
+  const prev=prevExam(ex);/* 总分进退步仍对比紧邻上一场 */
   const subjRanks={};ex.subjects.forEach(sub=>subjRanks[sub]=subjRankMap(ex,sub));
+  /* 各科进退步：对比上一场「有该科目」的考试 */
+  const subPrev={};ex.subjects.forEach(sub=>subPrev[sub]=prevExamForSub(ex,sub));
+  const prevNames=[...new Set(ex.subjects.map(sub=>{const p=subPrev[sub];return p?p.name:null;}).filter(Boolean))];
   /* 排序：按 gSort 对学生排序（空值沉底），默认保持名册顺序 */
   const valOf=(s,k)=>{
     if(k==="name")return s.name;
@@ -1170,13 +1173,13 @@ function viewGrades(v){
       <span class="chip">${esc(ex.date||"")}</span>
     </div>
     <div class="row" style="gap:6px">
-      <button class="btn ghost sm h30" onclick="W.importGrades('${ex.id}')">导入</button>
       <button class="btn ghost sm h30" onclick="W.exportGrades('${ex.id}')">导出</button>
       <button class="btn sm h30" onclick="W.newExam()">添加</button>
     </div>
   </div>
+  ${gradeTrendHtml()}
   <div class="card pad">
-    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">成绩（${ex.subjects.length} 科）${prev?`<span class="tiny muted" style="margin-left:8px;font-weight:400">进退步对比：${esc(prev.name)}</span>`:`<span class="tiny muted" style="margin-left:8px;font-weight:400">暂无上一场考试，进退步显示 —</span>`}</span>
+    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">成绩（${ex.subjects.length} 科）${prevNames.length===1?`<span class="tiny muted" style="margin-left:8px;font-weight:400">进退步对比：${esc(prevNames[0])}</span>`:prevNames.length>1?`<span class="tiny muted" style="margin-left:8px;font-weight:400">进退步对比：各科上次考试（${esc(prevNames.join("、"))}）</span>`:`<span class="tiny muted" style="margin-left:8px;font-weight:400">暂无上一场考试，进退步显示 —</span>`}</span>
       <div class="row">
         <button class="btn ${gradeEdit?"":"ghost"} sm" onclick="gradeEdit=!gradeEdit;viewGrades(document.getElementById('view'))">${gradeEdit?"✓ 完成编辑":"✎ 编辑成绩"}</button>
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
@@ -1186,14 +1189,14 @@ function viewGrades(v){
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const r=ranks[s.id];
-        const psc=prev?prev.scores[s.id]||{}:null;
         const subjCells=ex.subjects.map(sub=>{
-          const cur=(sc[sub]===undefined||sc[sub]==="")?null:+sc[sub];
-          const old=(prev&&psc&&psc[sub]!==undefined&&psc[sub]!=="")?+psc[sub]:null;
+          const cur=(sc[sub]===undefined||sc[sub]===null||sc[sub]==="")?null:+sc[sub];
+          const pe=subPrev[sub];const pv=pe?((pe.scores[s.id]||{})[sub]):undefined;
+          const old=(pv!==undefined&&pv!=="")?+pv:null;
           const sr=subjRanks[sub][s.id];
           return `<td class="g-sub">${gradeEdit
             ?`<input class="fld" style="width:37px;padding:4px 2px;text-align:center" value="${sc[sub]!==undefined?esc(sc[sub]):""}" onchange="W.setScore('${ex.id}','${s.id}','${esc(sub)}',this.value)">`
-            :(cur!==null?`<b>${cur}</b>`:`<span class="muted">—</span>`)}</td>`
+            :(cur!==null?`<b style="cursor:pointer" title="查看历次${esc(sub)}成绩" onclick="W.subHist('${s.id}','${esc(sub)}')">${cur}</b>`:`<span class="muted" style="cursor:pointer" onclick="W.subHist('${s.id}','${esc(sub)}')">—</span>`)}</td>`
             +deltaCell(cur,old)
             +`<td class="mini g-rank">${sr?`<b class="${sr<=3?"":"muted"}" style="${sr<=3?"color:var(--warn)":""}">${sr}</b>`:`<span class="muted">—</span>`}</td>`;
         }).join("");
@@ -1201,6 +1204,18 @@ function viewGrades(v){
         return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}<td class="mini g-rank">${r?`<b class="${r<=3?"":""}" style="${r<=3?"color:var(--warn)":""}">${r}</b>`:`<span class="muted">—</span>`}</td></tr>`;
       }).join("")}</tbody></table>
     </div>
+  </div>
+  ${gradeDistHtml(ex)}
+  <div class="card pad" style="margin-top:12px">
+    <div class="section-title" style="margin-bottom:6px">考试记录（${S.exams.length}）</div>
+    ${[...S.exams].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e=>{
+      const n=S.students.filter(s=>{const sc=e.scores[s.id]||{};return e.subjects.some(sub=>sc[sub]!==undefined&&sc[sub]!=="");}).length;
+      return `<div class="r-item" style="padding:7px 0">
+      <div style="flex:1;min-width:0"><b>${esc(e.name)}</b><div class="tiny muted">${esc(e.date||"")} · ${e.subjects.length} 科 · ${n} 人${e.note?" · "+esc(e.note):""}</div></div>
+      <span class="r-act">
+        <button onclick="W.editGAdd('${e.id}')" title="改备注">改</button>
+        <button class="del" onclick="W.delGAdd('${e.id}')" title="删除这场考试及成绩">删</button>
+      </span></div>`;}).join("")}
   </div>`;
 }
 function gradeRanks(ex){
@@ -1212,6 +1227,33 @@ function prevExam(ex){
   const i=sorted.findIndex(e=>e.id===ex.id);
   return i>0?sorted[i-1]:null;
 }
+/* 默认选中的考试：按日期取最近一场（同日期取后录入的） */
+function latestExamId(){
+  const sorted=[...S.exams].reverse().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  return sorted[0].id;
+}
+/* 点某学生某科成绩：弹窗列出他所有考试该科目的成绩 */
+W.subHist=(sid,sub)=>{
+  const st=el(sid,S.students);if(!st)return;
+  const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).filter(e=>e.subjects.includes(sub));
+  const rows=list.map(e=>{
+    const v=(e.scores[sid]||{})[sub];
+    const has=v!==undefined&&v!=="";
+    const rk=has?subjRankMap(e,sub)[sid]:null;
+    return `<div class="r-item" style="padding:7px 0">
+      <div style="flex:1;min-width:0"><b>${esc(e.name)}</b><div class="tiny muted">${esc(e.date||"")}</div></div>
+      <span class="row" style="gap:10px;flex:none">${has?`<b>${esc(v)}</b><span class="tiny ${rk&&rk<=3?"":"muted"}" style="${rk&&rk<=3?"color:var(--warn)":""}">第${rk}名</span>`:`<span class="tiny muted">未录入</span>`}</span></div>`;
+  }).join("");
+  openModal(`<h3>${esc(st.name)} · ${esc(sub)}</h3>
+  ${rows||`<div class="empty">暂无该科目的考试</div>`}
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
+/* 各科进退步的对比考试：上一场「有该科目」的考试（日期早于本场，逐科往前找） */
+function prevExamForSub(ex,sub){
+  const sorted=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  for(let i=sorted.findIndex(e=>e.id===ex.id)-1;i>=0;i--){if(sorted[i].subjects.includes(sub))return sorted[i];}
+  return null;
+}
 function subjRankMap(ex,sub){
   const arr=S.students.map(s=>{const sc=ex.scores[s.id]||{};const v2=sc[sub];return {id:s.id,v:(v2===undefined||v2==="")?null:+v2};}).filter(x=>x.v!==null).sort((a,b)=>b.v-a.v);
   const map={};arr.forEach((x,i)=>map[x.id]=i+1);return map;
@@ -1221,6 +1263,59 @@ function deltaCell(cur,old){
   const d=cur-old;
   if(!d)return `<td class="mini g-delta"><span class="muted">0</span></td>`;
   return `<td class="mini g-delta"><b style="color:${d>0?"var(--ok)":"var(--bad)"}">${d>0?"+"+d:d}</b></td>`;
+}
+/* ---- 成绩曲线：各科每次考试的班级平均分折线（纯 SVG） ---- */
+function gradeTrendHtml(){
+  const exams=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  if(!exams.length)return "";
+  const subs=[];exams.forEach(e=>e.subjects.forEach(s=>{if(!subs.includes(s))subs.push(s);}));
+  if(!subs.length)return "";
+  const series=subs.map(sub=>({sub,pts:exams.map(e=>{
+    let t=0,n=0;S.students.forEach(s=>{const v=(e.scores[s.id]||{})[sub];if(v!==undefined&&v!==""){t+=+v;n++;}});
+    return n?t/n:null;})}));
+  let maxV=0;series.forEach(se=>se.pts.forEach(v=>{if(v!==null&&v>maxV)maxV=v;}));
+  if(!maxV)return "";
+  const top=Math.max(100,Math.ceil(maxV/10)*10);
+  const W2=560,H=210,L=30,R=8,T=10,B=22,iw=W2-L-R,ih=H-T-B;
+  const X=i=>exams.length===1?L+iw/2:L+iw*i/(exams.length-1);
+  const Y=v=>T+ih*(1-v/top);
+  let g="";
+  for(let k=0;k<=4;k++){const v=Math.round(top*k/4),yy=+Y(v).toFixed(1);
+    g+=`<line x1="${L}" y1="${yy}" x2="${W2-R}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${L-4}" y="${yy+3}" text-anchor="end" font-size="9" fill="var(--ink-2)">${v}</text>`;}
+  exams.forEach((e,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(e.name.length>4?e.name.slice(0,4):e.name)}</text>`;});
+  let paths="",dots="";
+  series.forEach(se=>{
+    const c=subjColor(se.sub);
+    const seg=se.pts.map((v,i)=>v===null?null:[X(i),Y(v)]);
+    let d="",open=false;
+    seg.forEach(p=>{if(p){d+=(open?" L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);open=true;}else open=false;});
+    if(d)paths+=`<path d="${d}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
+    seg.forEach((p,i)=>{if(p)dots+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${c}"><title>${esc(se.sub)} · ${esc(exams[i].name)}：均分 ${Math.round(se.pts[i]*10)/10}</title></circle>`;});
+  });
+  const legend=subs.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px"><i style="width:8px;height:8px;border-radius:50%;background:${subjColor(s)}"></i>${esc(s)}</span>`).join("");
+  return `<div class="card pad" style="margin-top:12px">
+    <div class="between row wrap" style="margin-bottom:6px"><span class="section-title" style="margin:0">成绩曲线</span><span class="tiny muted">各科每次考试 · 班级平均分</span></div>
+    <div class="row wrap" style="gap:10px;margin-bottom:4px">${legend}</div>
+    <svg viewBox="0 0 ${W2} ${H}" style="width:100%;height:auto;display:block">${g}${paths}${dots}</svg>
+  </div>`;
+}
+/* ---- 分数段分布：当前考试各科分数段人数 ---- */
+function gradeDistHtml(ex){
+  let maxV=0;
+  ex.subjects.forEach(sub=>S.students.forEach(s=>{const v=(ex.scores[s.id]||{})[sub];if(v!==undefined&&v!=="")maxV=Math.max(maxV,+v);}));
+  if(!maxV)return "";
+  const top=Math.max(100,Math.ceil(maxV/10)*10);
+  const bands=[];
+  for(let lo=top-10;lo>=60;lo-=10)bands.push({lo,hi:lo===top-10?top:lo+9});
+  bands.push({lo:40,hi:59});
+  bands.push({lo:0,hi:39});
+  const cnt=(sub,b)=>{let n=0;S.students.forEach(s=>{const v=(ex.scores[s.id]||{})[sub];if(v!==undefined&&v!==""){const x=+v;if(x>=b.lo&&x<=b.hi)n++;}});return n;};
+  const lbl=b=>b.lo===0?`≤${b.hi}`:`${b.lo}~${b.hi}`;
+  return `<div class="card pad" style="margin-top:12px">
+    <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">分数段分布</span><span class="tiny muted">${esc(ex.name)} · 各科人数</span></div>
+    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>分数段</th>${ex.subjects.map(s=>`<th>${esc(s)}</th>`).join("")}</tr></thead>
+    <tbody>${bands.map(b=>`<tr><td class="c-no">${lbl(b)}</td>${ex.subjects.map(sub=>{const n=cnt(sub,b);return `<td class="mini"><span class="${n?"":"muted"}" style="${n?"font-weight:600":""}">${n||"·"}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table></div>
+  </div>`;
 }
 /* ---- 成绩规则：读取 / 兜底 ---- */
 function gradeRules(){
@@ -2494,15 +2589,23 @@ W.newExam=()=>{
   openModal(`<h3>新建考试</h3>
     <div class="field"><label class="lbl">考试名称 *</label><input class="fld" id="m_en" placeholder="如：第二次月考"></div>
     <div class="field"><label class="lbl">日期</label><input class="fld" type="date" id="m_ed" value="${todayStr()}"></div>
-    <div class="field"><label class="lbl">科目（逗号分隔）</label><input class="fld" id="m_es" value="${DEFAULT_SUBJECTS.slice(0,3).join(",")}"></div>
-    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doNewExam()">创建</button></div>`);
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.importNewExam()">导入</button></div>`);
 };
-W.doNewExam=()=>{
+/* 点「导入」直接弹文件选择窗：CSV 首列姓名、首行科目表头（总分/平均/排名列自动跳过），
+   导入成功即创建考试并直接保存，无需再确认 */
+W.importNewExam=()=>{
   const name=$("#m_en").value.trim();if(!name){toast("请填名称");return;}
-  const subjects=$("#m_es").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
-  const ex={id:uid(),name,date:$("#m_ed").value,subjects,scores:{}};
-  S.students.forEach(s=>ex.scores[s.id]={});
-  S.exams.push(ex);gradeExam=ex.id;save();closeModal();refresh();
+  const date=$("#m_ed").value;
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    const ex={id:uid(),name,date,subjects:[],scores:{}};
+    S.students.forEach(s=>ex.scores[s.id]={});
+    const r=applyGradeText(ex,text);
+    if(!r.ok){toast(r.msg);return;}
+    S.exams.push(ex);gradeExam=ex.id;
+    save();closeModal();refresh();
+    toast("已导入 "+r.n+" 人×"+r.subs+" 科"+(r.miss?"，未找到 "+r.miss+" 人":"")+(r.cnt?"；已自动记录 "+r.cnt+" 条加减分":""));
+  }));
 };
 W.editExam=id=>{const ex=el(id,S.exams);openModal(`<h3>编辑考试</h3>
   <div class="field"><label class="lbl">名称</label><input class="fld" id="m_en" value="${esc(ex.name)}"></div>
@@ -2517,6 +2620,28 @@ W.exportGrades=id=>{const ex=el(id,S.exams);let csv="姓名,"+ex.subjects.join("
   S.students.forEach(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
     csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")+`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""}\n`;});
   downloadCSV(ex.name,csv);};
+/* 考试记录：改备注 / 删除考试（连同成绩，撤销成绩规则自动记分） */
+W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
+  openModal(`<h3>修改考试</h3>
+    <div class="field"><label class="lbl">考试</label><input class="fld" value="${esc(ex.name)}" disabled style="opacity:.6"></div>
+    <div class="field"><label class="lbl">备注</label><input class="fld" id="m_gx" value="${esc(ex.note||"")}" placeholder="如：成绩已录入"></div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveGAdd('${ex.id}')">保存</button></div>`);};
+W.saveGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
+  ex.note=($("#m_gx").value||"").trim();
+  save();closeModal();viewGrades(document.getElementById("view"));toast("已保存");};
+W.delGAdd=id=>{
+  const ex=el(id,S.exams);if(!ex)return;
+  if(!confirm(`删除「${ex.name}」及全部成绩？该考试的自动加减分记录会一并撤销。`))return;
+  S.behaviors.filter(b=>b.auto===GRADE_TYPE&&b.examId===ex.id).forEach(b=>{
+    const d=b.delta||0;
+    if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
+  });
+  S.behaviors=S.behaviors.filter(b=>!(b.auto===GRADE_TYPE&&b.examId===ex.id));
+  S.points.logs=S.points.logs.filter(l=>!(l.auto===GRADE_TYPE&&l.examId===ex.id));
+  S.exams=S.exams.filter(e=>e.id!==ex.id);
+  if(gradeExam===ex.id)gradeExam=null;
+  save();viewGrades(document.getElementById("view"));toast("已删除考试");
+};
 const BEH_PT_CHOICES=[-5,-3,-2,-1,0,1,2,3,5];
 W.behPtsSel=(k,cur)=>{const def=btype(k).pts||0;const pick=(cur===undefined?def:cur);
   const set=[...new Set([def,...BEH_PT_CHOICES])].sort((a,b)=>a-b);
@@ -4310,24 +4435,6 @@ W.exportRoster=()=>{
   <div class="tiny muted" style="margin-bottom:6px">格式：${ROSTER_LABELS.slice(0,8).join(",")}（等级为当前有效等级：手动设定优先于计算）</div>
   <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(rosterText())}</textarea>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn ghost" onclick="W.downloadIO('学生名册')">下载 CSV</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
-};
-/* ---- 成绩导入 ---- */
-W.importGrades=id=>{
-  if(!S.exams.length){toast("先添加考试");return;}
-  openModal(`<h3>导入成绩</h3>
-  <div class="field row"><label class="lbl" style="margin:0;flex:none">导入到考试</label><select class="fld" id="m_ge">${S.exams.map(e=>`<option value="${e.id}" ${e.id===id?"selected":""}>${esc(e.name)}</option>`).join("")}</select></div>
-  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.applyGrades()">导入</button></div>`);
-};
-W.applyGrades=()=>{
-  const ex=el($("#m_ge").value,S.exams);if(!ex){toast("考试不存在");return;}
-  /* 点「导入」直接弹出系统文件选择窗口（CSV：首行科目表头，首列姓名） */
-  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
-    if(err){toast(err);return;}
-    const r=applyGradeText(ex,text);
-    if(!r.ok){toast(r.msg);return;}
-    save();closeModal();viewGrades(document.getElementById("view"));
-    toast("已导入 "+r.n+" 人×"+r.subs+" 科"+(r.miss?"，未找到 "+r.miss+" 人":"")+(r.cnt?"；已自动记录 "+r.cnt+" 条加减分":""));
-  }));
 };
 /* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数）。
    表头按列名定位（兼容列顺序变化与中间空列）；「总分/平均/排名」等汇总列自动跳过，
