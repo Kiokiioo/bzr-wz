@@ -1858,16 +1858,14 @@ function viewSeating(v){
   }).join(`<span class="tiny muted"> · </span>`);
   const hint=zoneBrush?(zoneBrush==="X"?"标记中：点座位撤除该处等级":zoneBrush==="F"?"标记中：点座位固定 / 解除固定（刷新后仍保持）":"标记中：点座位涂 "+zoneBrush+"，再点笔刷退出"):"A/B/C 涂区域 · 定 固定座位（不可擦除/移动） · 清 除区域（固定座不动）";
   v.innerHTML=`
-  <div class="between row wrap" style="margin-bottom:10px">
-    <div class="row" style="gap:6px;flex-wrap:wrap">
+  <div class="row wrap" style="margin-bottom:10px;justify-content:flex-end;gap:6px">
+      <button class="btn ghost sm h30" onclick="W.clearSeat()">清空</button>
+      <button class="btn sm h30 ${seatCfgOpen?'':'ghost'}" onclick="W.toggleSeatCfg()" title="展开/折叠 排数、列数、大组、学习组等设置">${seatCfgOpen?'▾':'▸'} 设置</button>
       <button class="btn sm h30 ${cfg.sexAware?'':'ghost'}" onclick="W.toggleSexAware()" title="考虑性别：尽量同性别坐同一排；不开启则不考虑">性别</button>
+      <button class="btn ghost sm h30" onclick="W.saveSeatRecord()" title="把当前座位表保存为一条排位记录，存进历史记录，可随时恢复">记录</button>
+      <button class="btn sm h30 ${mergeMode?'':'ghost'}" onclick="W.toggleMergeMode()" title="学习组合并：点「合并」进入选择，点 2+ 个学习组名（可跨大组），再点「合并」执行合并">合并</button>
       <button class="btn ghost sm h30" onclick="W.autoSeat('random')">随机排</button>
       <button class="btn sm h30 ${tierOpen?'':'ghost'}" onclick="W.toggleTierPanel()" title="按等级排位：涂 A/B/C 区域后一键排座">等级排</button>
-      <button class="btn sm h30 ${mergeMode?'':'ghost'}" onclick="W.toggleMergeMode()" title="学习组合并：点「合并」进入选择，点 2+ 个学习组名（可跨大组），再点「合并」执行合并">合并</button>
-      <button class="btn ghost sm h30" onclick="W.saveSeatRecord()" title="把当前座位表保存为一条排位记录，存进历史记录，可随时恢复">记录</button>
-      <button class="btn ghost sm h30" onclick="W.clearSeat()">清空</button>
-    </div>
-    <button class="btn sm h30 ${seatCfgOpen?'':'ghost'}" onclick="W.toggleSeatCfg()" title="展开/折叠 排数、列数、大组、学习组等设置">${seatCfgOpen?'▾':'▸'} 设置</button>
   </div>
   ${seatCfgOpen?`<div class="seat-cfg">
     <div class="row wrap" style="gap:8px;align-items:center">
@@ -3904,9 +3902,9 @@ W.setManual=(id,t)=>{
 };
 
 /* ---- 排座 导入/导出（合一） ----
-   导出网格：首行 R排,C列；每座两格 —— 有人「姓名(!),等级」、空座「区域或-(!),空」；! 为固定座。
+   导出网格：首行 R排,C列；每座三格 —— 「姓名(!)/区域/等级」（空座姓名位写 -，无等级写 -）；! 为固定座。
    网格后附学习组结构行（大组/学习组/第0排/合并），导入整体还原到具体学习组。
-   导入自动识别：有 R,C 头 → 网格（座次+等级+区域+学习组，有哪部分导哪部分）；无头 → 按「姓名,等级」名单只导等级。 */
+   导入自动识别：有 R,C 头 → 网格（座次+区域+等级+学习组，兼容旧两格/单格格式）；无头 → 按「姓名,等级」名单只导等级。 */
 const csvField=v=>/[",\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':String(v);
 const seatText=()=>{
   const cfg=S.seatCfg;
@@ -3918,13 +3916,13 @@ const seatText=()=>{
     for(let c=0;c<cfg.cols;c++){
       const i=r*cfg.cols+c;
       const sid=seating[i];const st=sid?el(sid,S.students):null;
+      const z=zones[i];const zs=(z&&/^[ABC]$/.test(z))?z:"-";
       const fx=fixed[i]?"!":"";
       if(st){
         const t=tierOf(st);
-        row.push(csvField(st.name)+fx+","+(/^[ABC]$/.test(t)?t:""));
+        row.push(csvField(st.name)+fx+","+zs+","+(/^[ABC]$/.test(t)?t:"-"));
       }else{
-        const z=zones[i];
-        row.push(((z&&/^[ABC]$/.test(z))?z:"-")+fx+",");
+        row.push("-"+fx+","+zs+",-");
       }
     }
     lines.push(row.join(","));
@@ -3944,7 +3942,11 @@ W.seatIO=k=>{
       if(!String(text||"").trim()){toast("内容为空");return;}
       const r=applySeatText(text);
       if(r===null){/* 无 R,C 头 → 「姓名,等级」名单：只导入等级 */
-        const t=applyTierText(text);save();
+        const t=applyTierText(text);
+        if(!t.done){/* 名单也一人都没匹配上 → 判定为格式不识别，明确报错而不是静默 0 人 */
+          toast("文件格式无法识别：排座文件首行应为 R…,C…（等级名单首行应为 姓名,等级）");return;
+        }
+        save();
         if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
         toast("已导入等级名单："+t.done+" 人"+(t.miss?"，"+t.miss+" 行未匹配":""));return;
       }
@@ -3955,8 +3957,8 @@ W.seatIO=k=>{
     }));
     return;
   }
-  openModal(`<h3>导出座次 + 等级</h3>
-  <div class="tiny muted" style="margin-bottom:6px">每座两格：有人「姓名,等级」、空座「区域或-」，! 为固定座；末尾大组/学习组/合并行还原学习组结构。导入自动识别本文件或纯等级名单。</div>
+  openModal(`<h3>导出座次 + 排位 + 等级</h3>
+  <div class="tiny muted" style="margin-bottom:6px">每座三格「姓名/区域/等级」，一份文件同时还原座次、ABC 排位色与等级；! 为固定座；末尾大组/学习组/合并行还原学习组结构。导入自动识别本文件或纯等级名单。</div>
   <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(seatText())}</textarea>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" onclick="W.downloadIO('排座导出')">下载 CSV</button><button class="btn ghost" onclick="W.copyIO()">复制</button></div>`);
 };
@@ -3972,48 +3974,92 @@ function splitCsvLine(line){
     else cur+=ch;}
   out.push(cur);return out;
 }
-/* 解析排座导出文本：返回 null=非网格（调用方按等级名单处理）；{ok,msg}=结果（除写入 s.tier 外不改学生数据） */
+/* 解析排座导出文本：返回 null=非网格（调用方按等级名单处理）；{ok,msg}=结果（除写入 s.tier 外不改学生数据）
+   按字段数自动识别三种行格式：
+   三格制（当前版）：每座「姓名!/区域/等级」——有人座位也带区域，导入完整还原排位色；
+   两格制（旧合并版）：每座「姓名!/等级」，有人座位区域沿用现有数据；
+   单格制（更旧）：每格「区域」。行尾字段被 Excel 丢掉的文件走贪心解析。 */
 function applySeatText(txt){
-  const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  const head=lines.length?lines[0].replace(/\s*,\s*/g," ").match(/^R(\d+)\s+C(\d+)$/i):null;
+  /* 每行去掉首尾空白与**末尾冗余逗号**（WPS/Excel 另存会把所有行补齐到同一列数，给行尾垫一串逗号，
+     否则「第0排:1,,,,…」这类结构行无法按值匹配）。网格行中间的逗号不受影响。 */
+  const all=String(txt||"").replace(/^\ufeff/g,"").replace(/\u0000/g,"").trim().split(/\r?\n/).map(l=>l.trim().replace(/[,，]+$/,"")).filter(Boolean);
+  const head=all.length?all[0].replace(/[\s,，、]/g,"").match(/^R(\d+)C(\d+)$/i):null;
   if(!head)return null;
-  const rows=+head[1],cols=+head[2];
-  if(rows<1||rows>12||cols<1||cols>12||lines.length<rows+1)return {ok:false,msg:"行列数超出范围或行数不足"};
-  /* 第0排：导入行数 = 当前排数+1 → 含第0排；= 当前排数 → 不含 */
-  let r0=!!S.seatCfg.row0;
-  if(r0&&rows===S.seatCfg.rows){r0=false;}
-  else if(!(r0&&rows===S.seatCfg.rows+1)){r0=false;}
+  let rows=+head[1];const cols=+head[2];
+  /* 结构行（大组/学习组/第0排/合并）无论混在哪个位置都先剔出网格区，避免行错位把结构行当姓名 */
+  const isStruct=L=>/^(?:大组|学习组|第0排|合并)\s*[:：]/.test(L);
+  const lines=[all[0]].concat(all.slice(1).filter(L=>!isStruct(L)));
+  const structLines=all.slice(1).filter(L=>isStruct(L));
+  let rowNote="";
+  if(cols<1||cols>12)return {ok:false,msg:"列数超出范围（C"+cols+"）"};
+  const dataRows=lines.length-1;
+  if(dataRows!==rows){
+    if(dataRows<rows)rowNote="（文件声明 "+rows+" 排，实际网格 "+dataRows+" 排，缺的排按空位导入）";
+    else rowNote="（文件声明 "+rows+" 排，实际网格 "+dataRows+" 排，已按实际排数导入）";
+    rows=dataRows;
+  }
+  if(rows<1||rows>12)return {ok:false,msg:"排数超出范围（R"+rows+"）"};
+  /* 第0排：文件结构行「第0排:1/0」显式声明优先；未声明时按行数推断（比当前排数多一行 → 视为含第0排） */
+  const r0Lines=structLines.filter(L=>/^第0排\s*[:：]/.test(L));
+  let r0;
+  if(r0Lines.length){
+    /* 容错全角数字/空格：如「第0排：１」 */
+    const v=r0Lines[r0Lines.length-1].replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-65296));
+    r0=/:\s*1\s*$/.test(v);
+  }
+  else if(rows===S.seatCfg.rows+1)r0=true;
+  else r0=false;
+  if(r0&&rows<2)return {ok:false,msg:"排数无效（含第0排至少需 2 排）"};
   S.seatCfg.rows=r0?rows-1:rows;S.seatCfg.cols=cols;S.seatCfg.row0=r0;
   const total=rows*cols;
-  const zones=new Array(total).fill(null),fixed=new Array(total).fill(false);
+  const zones=new Array(total).fill(undefined),fixed=new Array(total).fill(false);
   const seat=new Array(total).fill(null);
   let seated=0,tierSet=0,missName=0;
+  const missList=[];
   const place=(i,s)=>{for(let j=0;j<total;j++)if(seat[j]===s.id)seat[j]=null;seat[i]=s.id;};
+  /* 姓名匹配去空白（含全角空格），容忍名册里带首尾空格的名字 */
+  const norm=s=>String(s||"").replace(/[\s\u3000]+/g,"");
+  const byName={};S.students.forEach(s=>{const k=norm(s.name);if(k&&!(k in byName))byName[k]=s;});
+  const isZoneTok=t=>!t||t==="-"||/^[ABC]!?$/.test(t.toUpperCase());
   for(let r=0;r<rows;r++){
-    const f=splitCsvLine(lines[r+1]);
-    const paired=f.length>=cols*2;
-    if(!paired&&f.length<cols)return {ok:false,msg:"第 "+(r+1)+" 行列数不足"};
+    const f=splitCsvLine(lines[r+1]).map(x=>x.trim());
+    const m3=f.length===cols*3,m2=!m3&&f.length===cols*2;
+    if(!m3&&!m2&&f.length<cols)return {ok:false,msg:"第 "+(r+1)+" 行列数不足"};
+    let p=0;
     for(let c=0;c<cols;c++){
       const i=r*cols+c;
-      const v1=(f[paired?c*2:c]||"").trim();
-      const v2=paired?(f[c*2+1]||"").trim().toUpperCase():"";
-      const fx=/!$/.test(v1)||/!$/.test(v2);
-      const t1=v1.replace(/!+$/,""),t2=v2.replace(/!+$/,"");
-      if(paired&&t1&&t1!=="-"&&!/^[ABC]$/.test(t1)){/* 有人格：座次 + 等级 */
-        const s=S.students.find(x=>x.name===t1);
-        if(s){place(i,s);seated++;if(/^[ABC]$/.test(t2)){s.tier=t2;tierSet++;}}
-        else missName++;
-      }else{/* 空座格：区域写在任一格均可 */
-        zones[i]=(/^[ABC]$/.test(t1)?t1:(/^[ABC]$/.test(t2)?t2:null));
+      let v1="",v2="",v3="";
+      if(m3){v1=f[c*3]||"";v2=f[c*3+1]||"";v3=(f[c*3+2]||"").toUpperCase();}
+      else if(m2){v1=f[c*2]||"";v2=(f[c*2+1]||"").toUpperCase();}
+      else{
+        /* 贪心：人名后紧跟的 A/B/C 视为其等级 */
+        v1=f[p]||"";p++;
+        if(!isZoneTok(v1)){
+          const nx=(f[p]||"").toUpperCase();
+          if(isZoneTok(nx)&&nx&&nx!=="-"){v2=nx;p++;}
+        }
       }
+      const fx=/!$/.test(v1)||/!$/.test(v2);
+      const t1=v1.replace(/!+$/,""),t2=v2.replace(/!+$/,""),t3=v3.replace(/!+$/,"");
+      const isName=t1&&t1!=="-"&&!/^[ABC]$/.test(t1.toUpperCase());
+      if(isName){/* 有人格：座次 + 等级 */
+        const s=byName[norm(t1)];
+        if(s){
+          place(i,s);seated++;
+          const tier=[t3,t2].find(x=>/^[ABC]$/.test(x));
+          if(tier){s.tier=tier;tierSet++;}
+        }else{missName++;if(missList.length<5)missList.push(t1);}
+      }
+      /* 区域：三格制每座都带；两格制有人座不携带（undefined → 沿用现有）；单格/贪心写在首格 */
+      if(m3)zones[i]=["A","B","C"].includes(t2)?t2:null;
+      else if(m2)zones[i]=isName?undefined:(["A","B","C"].includes(t1)?t1:null);
+      else zones[i]=["A","B","C"].includes(t1)?t1:null;
       fixed[i]=fx;
     }
   }
-  /* 学习组结构行（可选，全部还原到具体学习组）；重复结构行以后者为准；第0排行优先，覆盖行数推断 */
-  const _r0s=lines.slice(rows+1).filter(L=>/^第0排[:：]/.test(L));
-  if(_r0s.length){const on=/:\s*1\s*$/.test(_r0s[_r0s.length-1]);S.seatCfg.row0=on;S.seatCfg.rows=Math.max(1,on?rows-1:rows);}
-  for(let li=rows+1;li<lines.length;li++){
-    const L=lines[li];let m;
+  /* 学习组结构行（可选，全部还原到具体学习组）；重复结构行以后者为准（第0排已在上方预扫描） */
+  structLines.forEach(L=>{
+    let m;
     if((m=L.match(/^大组[:：]\s*(.+)$/))){
       const arr=m[1].split(/[-,，\s]+/).map(x=>parseInt(x,10)).filter(x=>x>0);
       if(arr.length&&arr.reduce((a,b)=>a+b,0)===cols)S.seatCfg.bigGroups=arr;
@@ -4032,15 +4078,16 @@ function applySeatText(txt){
       });
       S.seatCfg.studyMerges=arr;
     }
-  }
+  });
   /* 列数变化时把大组列数缩放到新 cols（与 setSeatCfg('cols') 同规则；文件带了合法大组行则已按文件） */
   {const _bg=Array.isArray(S.seatCfg.bigGroups)&&S.seatCfg.bigGroups.length?S.seatCfg.bigGroups:[Math.min(3,cols)];
    const _used=_bg.reduce((a,b)=>a+b,0);
    if(_used>cols){let acc=0;S.seatCfg.bigGroups=_bg.map(x=>{const remain=cols-acc;const v=Math.min(x,Math.max(0,remain));acc+=v;return v;}).filter(x=>x>0);if(!S.seatCfg.bigGroups.length)S.seatCfg.bigGroups=[cols];}
    else if(_used<cols){_bg[_bg.length-1]=(_bg[_bg.length-1]||0)+(cols-_used);S.seatCfg.bigGroups=_bg;}}
+  /* 未显式带区域的格子：尺寸一致时沿用现有区域，否则置空 */
   const oldZones=(Array.isArray(S.seatZones)&&S.seatZones.length===total)?S.seatZones:null;
-  if(oldZones){/* 有人格不携带区域信息 → 沿用原区域 */
-    for(let i=0;i<total;i++)if(seat[i]&&zones[i]===null)zones[i]=oldZones[i]||null;
+  for(let i=0;i<total;i++){
+    if(zones[i]===undefined)zones[i]=(oldZones&&seat[i])?(oldZones[i]||null):null;
   }
   /* 有人 → 座次按文件整表重建（文件里没有的学生不再就座）；纯区域网格 → 尺寸一致沿用原座次 */
   const hasAny=seat.some(Boolean);
@@ -4048,19 +4095,22 @@ function applySeatText(txt){
   S.seatZones=zones;S.seatFixed=fixed;
   S.seating=hasAny?seat:(keepSeating?S.seating:new Array(total).fill(null));
   W.syncStudyGroups();
-  if(hasAny)return {ok:true,msg:"已导入座次+等级："+seated+" 人就座"+(tierSet?"，"+tierSet+" 人设等级":"")+(missName?"，"+missName+" 个姓名未匹配":"")};
-  return {ok:true,msg:"已导入座位区域（不含学生座次）"+(keepSeating?"":"，尺寸变化原座位已清空")};
+  const missTxt=missName?("，"+missName+" 个姓名未匹配"+(missList.length?"："+missList.join("、")+(missName>missList.length?" 等":""):"")):"";
+  const r0Txt=r0?"（含第0排）":"（不含第0排）";
+  if(hasAny)return {ok:true,msg:"已导入座次+等级："+seated+" 人就座"+(tierSet?"，"+tierSet+" 人设等级":"")+r0Txt+rowNote+missTxt+(seated===0?"（请核对文件里姓名与名册是否一致，或页面是否为最新版本）":"")};
+  return {ok:true,msg:"已导入座位区域（不含学生座次）"+r0Txt+rowNote+(keepSeating?"":"，尺寸变化原座位已清空")+missTxt+(missName?"（网格里没有匹配到的学生姓名）":"")};
 }
 /* 等级名单的独立导入/导出入口已并入 seatIO：导出=座次网格自带等级；导入自动识别无 R,C 头的「姓名,等级」名单 */
 /* 解析「姓名,等级」文本并写入手动等级；返回 {done,miss}（纯函数） */
 function applyTierText(txt){
-  const lines=String(txt||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const lines=String(txt||"").replace(/^\ufeff/,"").replace(/\u0000/g,"").trim().split(/\r?\n/).map(l=>l.trim().replace(/[,，]+$/,"")).filter(Boolean);
+  const norm=s=>String(s||"").replace(/[\s\u3000]+/g,"");
   let done=0,miss=0;
   lines.forEach(l=>{
     if(/^姓名\s*,/.test(l))return;
     const i=l.lastIndexOf(",");if(i<0){miss++;return;}
-    const name=l.slice(0,i).trim(),t=l.slice(i+1).trim().toUpperCase();
-    const s=S.students.find(x=>x.name===name);
+    const name=norm(l.slice(0,i)),t=l.slice(i+1).trim().toUpperCase();
+    const s=S.students.find(x=>norm(x.name)===name);
     if(!s){miss++;return;}
     s.tier=["A","B","C"].includes(t)?t:"";done++;
   });
@@ -4555,22 +4605,26 @@ function readTextFile(inputId,cb){
   if(!f){cb(null,"请选择文件");return;}
   readFileAsText(f,cb);
 }
-/* 读取 File 为文本：先按 UTF-8，读出替换符（U+FFFD）说明多半是 Excel 另存的 ANSI/GBK 编码，自动改按 GBK 重读 */
+/* 读取 File 为文本：读原始字节探测 BOM —— UTF-8 / UTF-16LE(记事本"Unicode") / UTF-16BE 都能正确解码；
+   无 BOM 且按 UTF-8 读出替换符（U+FFFD）说明多半是 Excel 另存的 ANSI/GBK，自动改按 GBK 重读 */
 function readFileAsText(f,cb){
   const rd=new FileReader();
   rd.onload=()=>{
-    const t=String(rd.result||"");
-    if(t.indexOf("\uFFFD")>=0){
-      const rd2=new FileReader();
-      rd2.onload=()=>cb(String(rd2.result||""),null);
-      rd2.onerror=()=>cb(t,null);/* GBK 也失败则退回原结果 */
-      rd2.readAsText(f,"GBK");
-      return;
-    }
-    cb(t,null);
+    const buf=rd.result;
+    try{
+      const u8=new Uint8Array(buf);
+      if(u8.length>=2&&u8[0]===0xFF&&u8[1]===0xFE){cb(new TextDecoder("utf-16le").decode(buf),null);return;}
+      if(u8.length>=2&&u8[0]===0xFE&&u8[1]===0xFF){cb(new TextDecoder("utf-16be").decode(buf),null);return;}
+      const t=new TextDecoder("utf-8").decode(buf);
+      if(t.indexOf("\uFFFD")>=0){
+        try{cb(new TextDecoder("gbk").decode(buf),null);}catch(e){cb(t,null);}
+        return;
+      }
+      cb(t,null);
+    }catch(e){cb(null,"文件读取失败");}
   };
   rd.onerror=()=>cb(null,"文件读取失败");
-  rd.readAsText(f,"UTF-8");
+  rd.readAsArrayBuffer(f);
 }
 /* 点击即弹出系统文件选择窗口（无需先开弹窗）：accept 形如 ".csv,text/csv"；选中后回调 cb(file) */
 function pickFile(accept,cb){
