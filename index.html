@@ -618,6 +618,8 @@ function def(){
     terms:[],
     /* 班级工作：职务 + 周期自动加分。{id,name,cycle:'day'|'week',pts,studentIds:[]} */
     classJobs:[],
+    /* 备忘录：{id,text,time,pinned} —— pinned 的排在顶端并同步到首页 */
+    memos:[],
     /* 科任老师：仅信息记录，不参与加分。{id,name,subject,phone} */
     teachers:[],
     /* 历史任职：换届时把当前任职归档。{id,kind:'job'|'teacher',role,holderName,from,to,extras?:{subject,phone}} */
@@ -804,6 +806,7 @@ const NAV=[
   {r:"home",t:"首页",ic:"🏠"},
   {r:"seating",t:"排位",ic:"🪑"},
   {r:"todos",t:"事务安排",ic:"✅"},
+  {r:"memo",t:"备忘录",ic:"📌"},
   {r:"behavior",t:"行为记录",ic:"📝"},
   {r:"behtypes",t:"行为类别",ic:"🏷️",hide:true},
   {r:"grades",t:"成绩管理",ic:"📊"},
@@ -890,7 +893,7 @@ function refresh(){route();}
 const routes={
   home:viewHome, roster:viewRoster,
   grades:v=>{trendSub=null;trendMark=null;viewGrades(v);},/* 进入成绩管理页默认显示全部科目；图例点选仅会话内生效 */
-  todos:viewTasks, behavior:viewBehavior,
+  todos:viewTasks, behavior:viewBehavior, memo:viewMemo,
   seating:viewSeating, tiers:viewTiers, points:viewPoints, lottery:viewLottery, schedule:viewSchedule,
   jobs:viewJobs, behtypes:viewBehTypes, data:viewData
 };
@@ -913,7 +916,7 @@ function route(){
   if(h!=="home") window.scrollTo(0,0);
 }
 const SUB={
-  home:"今日待办、快捷操作与最近动态", roster:"班级学生花名册，支持导入与搜索",
+  home:"今日待办、快捷操作与最近动态", memo:"随时记录要记住的事，可置顶并同步到首页", roster:"班级学生花名册，支持导入与搜索",
   grades:"按考试录入成绩并自动排名", todos:"班级日常事务与固定日期的工作安排，合并管理", behavior:"表扬、违纪、请假等记录",
   seating:"教室座位排布与轮换", tiers:"成绩+积分−身高 加权计算 A/B/C 等级",
   points:"个人与小组积分榜", lottery:"随机抽人 + 自定义惩罚抽取",
@@ -966,7 +969,9 @@ function viewHome(v){
   <div class="card pad recent" style="margin-top:14px">
     <div class="section-title">最近记录</div>
     ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
-  </div>`;
+  </div>
+  ${memoHomeCard()}
+`;
 }
 W.addHomeTask=()=>{
   const i=$("#homeTaskInput");if(!i)return;
@@ -1069,6 +1074,94 @@ function todayLessonsCard(){
     ${body}
   </div>`;
 }
+
+/* ============ 备忘录 ============ */
+function memoHomeCard(){
+  const pinned=(S.memos||[]).filter(m=>m.pinned);
+  if(!pinned.length)return '';
+  const items=pinned.slice().sort((a,b)=>(b.time||'').localeCompare(a.time||'')).slice(0,3).map(m=>`
+    <div class='r-item' style='padding:7px 0'>
+      <span class='r-dot' style='background:var(--warn);color:var(--warn)'></span>
+      <div style='flex:1;min-width:0'>
+        <div style='white-space:pre-wrap;word-break:break-word'>📌 ${esc(m.text)}</div>
+        <div class='tiny muted' style='margin-top:2px'>${esc(m.time||'')}</div>
+      </div>
+    </div>`).join('');
+  return `<div class='card pad' style='margin-top:14px'>
+    <div class='between row' style='margin-bottom:12px'>
+      <span class='section-title' style='margin:0'>备忘录</span>
+      <a class='chip brand' href='#memo' style='text-decoration:none'>查看全部</a>
+    </div>
+    ${items}
+  </div>`;
+}
+function viewMemo(v){
+  const all=(S.memos||[]).slice().sort((a,b)=>{
+    if(!!a.pinned!==!!b.pinned)return a.pinned?-1:1;
+    return (b.time||'').localeCompare(a.time||'');
+  });
+  const list=all.length?all.map(m=>`
+    <div class='r-item'>
+      <span class='r-dot' style='background:${m.pinned?'var(--warn)':'var(--muted)'};color:${m.pinned?'var(--warn)':'var(--muted)'}'></span>
+      <div style='flex:1;min-width:0'>
+        <div style='white-space:pre-wrap;word-break:break-word'>${m.pinned?'📌 ':''}${esc(m.text)}</div>
+        <div class='tiny muted' style='margin-top:3px'>${esc(m.time||'')}</div>
+      </div>
+      <span class='r-act'>
+        <button onclick='W.togglePin("${m.id}")' title='${m.pinned?'取消置顶':'置顶'}'>${m.pinned?'取消置顶':'置顶'}</button>
+        <button onclick='W.editMemo("${m.id}")' title='编辑'>改</button>
+        <button class='del' onclick='W.delMemo("${m.id}")'>删</button>
+      </span>
+    </div>`).join(''):`<div class='empty' style='padding:20px 10px'><div class='big'>📝</div>还没有备忘录，写下要记住的事吧</div>`;
+  v.innerHTML=`
+  <div class='card pad' style='margin-bottom:14px'>
+    <div class='between row' style='margin-bottom:12px'>
+      <span class='section-title' style='margin:0'>写一条备忘录</span>
+    </div>
+    <div class='row' style='gap:6px;align-items:flex-start'>
+      <textarea class='fld' id='memoInput' rows='2' style='flex:1;min-width:0' placeholder='输入备忘内容，回车提交（Shift+Enter 换行）…' onkeydown='if(event.key===\"Enter\"&&!event.shiftKey){event.preventDefault();W.addMemo()}'></textarea>
+      <button class='btn h30' style='flex:none' onclick='W.addMemo()'>添加</button>
+    </div>
+  </div>
+  <div class='card pad'>
+    <div class='between row' style='margin-bottom:8px'>
+      <span class='section-title' style='margin:0'>全部备忘录（${all.length}）</span>
+      <span class='tiny muted'>置顶的优先排在顶端</span>
+    </div>
+    ${list}
+  </div>`;
+  const ta=$("#memoInput");if(ta)ta.focus();
+}
+function reMemo(){ if((location.hash||'')==='#memo') viewMemo(document.getElementById('view')); }
+W.addMemo=()=>{
+  const ta=$("#memoInput");if(!ta)return;
+  const v=ta.value.trim();if(!v){toast('请输入备忘内容');return;}
+  (S.memos=S.memos||[]).unshift({id:uid(),text:v,time:nowStr(),pinned:false});
+  save();route();toast('已添加备忘录');
+};
+W.togglePin=id=>{
+  const m=el(id,S.memos||[]);if(!m)return;
+  m.pinned=!m.pinned;save();reMemo();toast(m.pinned?'已置顶':'已取消置顶');
+};
+W.editMemo=id=>{
+  const m=el(id,S.memos||[]);if(!m)return;
+  openModal(`<h3>编辑备忘录</h3>
+    <div class='field'><label class='lbl'>内容</label><textarea class='fld' id='m_mt' rows='4' style='width:100%;resize:vertical'>${esc(m.text)}</textarea></div>
+    <div class='row' style='gap:8px;justify-content:flex-end;margin-top:6px'>
+      <button class='btn ghost' onclick='closeModal()'>取消</button>
+      <button class='btn' onclick='W.saveMemo("${m.id}")'>保存</button>
+    </div>`);
+  const ta=$("#m_mt");if(ta)ta.focus();
+};
+W.saveMemo=id=>{
+  const m=el(id,S.memos||[]);if(!m)return;
+  const v=$("#m_mt").value.trim();if(!v){toast('内容不能为空');return;}
+  m.text=v;save();closeModal();reMemo();toast('已保存');
+};
+W.delMemo=id=>{
+  if(!confirm('删除这条备忘录？'))return;
+  S.memos=(S.memos||[]).filter(x=>x.id!==id);save();reMemo();
+};
 function buildRecent(){
   const list=[];
   S.behaviors.forEach(b=>{
