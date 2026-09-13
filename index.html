@@ -198,6 +198,8 @@ html[data-theme="dark"] .task-card:hover{background:color-mix(in srgb,var(--bran
 .r-act button{padding:3px 8px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--ink-2);font-size:12px;font-weight:600}
 .r-act button:hover{background:var(--panel);color:var(--ink);border-color:var(--line)}
 .r-act button.del:hover{color:var(--bad);background:var(--bad-soft);border-color:transparent}
+.r-item.cancelled{opacity:.5}
+.r-item.cancelled .r-act{opacity:1}
 .stat{display:flex;flex-direction:column;gap:2px}
 .stat .n{font-size:24px;font-weight:800}
 .stat .t{font-size:12px;color:var(--ink-2)}
@@ -2324,14 +2326,14 @@ function rdmItem(id){return el(id,ensureRedeem().items);}
 function rdmRewardSpent(sid){
   const R=ensureRedeem();
   return (R.logs||[]).reduce((a,l)=>{
-    if(l.studentId!==sid||l.type==='eliminate')return a;
+    if(l.studentId!==sid||l.type==='eliminate'||l.cancelled)return a;
     return a+(+l.cost||0)*(+l.qty||1);
   },0);
 }
 function rdmForgiven(sid){
   const R=ensureRedeem();
   return (R.logs||[]).reduce((a,l)=>{
-    if(l.studentId!==sid||l.type!=='eliminate')return a;
+    if(l.studentId!==sid||l.type!=='eliminate'||l.cancelled)return a;
     const c=(+l.qty||0)?(+l.cost||0)*(+l.qty||1):(+l.cost||0);
     return a+c;
   },0);
@@ -2372,15 +2374,16 @@ function redeemSectionHtml(){
   `).join("")||(R.items.length?"":`<div class="empty">还没有兑换项目，点「管理」添加分类与奖励</div>`);
   const all=(R.logs||[]).slice().sort((a,b)=>(b.time||"").localeCompare(a.time||"")).slice(0,15);
   const logHtml=all.length?all.map(l=>{
+    const acts=l.cancelled?`<span class="r-act"><button class="del" onclick="W.rdmDelLog('${l.id}')">删除</button></span>`:`<span class="r-act"><button onclick="W.rdmUndo('${l.id}')">撤销</button><button class="del" onclick="W.rdmDelLog('${l.id}')">删除</button></span>`;
     if(l.type==='eliminate'){
       const n=(+l.eliminated||(+l.cost||0)*(+l.qty||1)), m=n;
       const it=l.itemName?` <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""}`:"";
-      return `<div class="r-item"><span class="r-dot" style="background:var(--bad);color:var(--bad)"></span>
-        <div style="flex:1"><div>${esc(studentName(l.studentId))} 消除扣分${it} <b>${n}</b> 分<span class="tiny muted">（恢复 ${m} 可兑换积分，不改动原积分）</span></div><div class="tiny muted">${esc(l.time)}</div></div></div>`;
+      return `<div class="r-item${l.cancelled?' cancelled':''}"><span class="r-dot" style="background:var(--bad);color:var(--bad)"></span>
+        <div style="flex:1"><div>${esc(studentName(l.studentId))} 消除扣分${it} <b>${n}</b> 分<span class="tiny muted">（恢复 ${m} 可兑换积分，不改动原积分）</span>${l.cancelled?`<span class="tiny muted"> · 已撤销</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div>${acts}</div>`;
     }
     const c=(+l.cost||0)*(+l.qty||1);
-    return `<div class="r-item"><span class="r-dot" style="background:var(--warn);color:var(--warn)"></span>
-      <div style="flex:1"><div>${esc(studentName(l.studentId))} 兑换 <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""} <b>−${c}</b> 分${l.catName?` <span class="tiny muted">· ${esc(l.catName)}</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div></div>`;
+    return `<div class="r-item${l.cancelled?' cancelled':''}"><span class="r-dot" style="background:var(--warn);color:var(--warn)"></span>
+      <div style="flex:1"><div>${esc(studentName(l.studentId))} 兑换 <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""} <b>−${c}</b> 分${l.catName?` <span class="tiny muted">· ${esc(l.catName)}</span>`:""}${l.cancelled?`<span class="tiny muted"> · 已撤销</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div>${acts}</div>`;
   }).join(""):`<div class="empty">还没有兑换记录</div>`;
   return `
   <div class="card pad">
@@ -2396,6 +2399,31 @@ function redeemSectionHtml(){
   </div>`;
 }
 W.setRdmFilter=val=>{redeemCatFilter=val||"all";viewPoints(document.getElementById("view"));};
+/* 撤销一条兑换/消除记录：复原其积分影响（标记 cancelled，rdmRewardSpent/rdmForgiven 已排除），reward 有限量时退回库存；记录保留为「已撤销」 */
+W.rdmUndo=id=>{
+  const R=ensureRedeem();const l=(R.logs||[]).find(x=>x.id===id);if(!l)return;
+  if(l.cancelled){toast("该记录已撤销");return;}
+  const isReward=l.type!=='eliminate';
+  const it=isReward?rdmItem(l.itemId):null;
+  const stockTip=(it&&rdmStock(it)!==null)?"，并退回该物品库存":"";
+  if(!confirm("撤销该"+(isReward?"兑换":"消除扣分")+"？将恢复对应的可兑换积分"+stockTip+"。\n撤销后记录会保留为「已撤销」（可再删除）。"))return;
+  if(it&&rdmStock(it)!==null)it.stock=Math.max(0,(rdmStock(it)||0)+(+l.qty||1));
+  l.cancelled=true;
+  save();refresh();
+  toast("已撤销，可兑换积分已恢复"+(stockTip?"，库存已退回":""));
+};
+/* 从兑换记录中彻底删除一条：未撤销的 reward 一并复原积分与库存（已撤销过的记录不再重复退库存） */
+W.rdmDelLog=id=>{
+  const R=ensureRedeem();const l=(R.logs||[]).find(x=>x.id===id);if(!l)return;
+  const isReward=l.type!=='eliminate';
+  const it=isReward?rdmItem(l.itemId):null;
+  const backTip=!l.cancelled&&it&&rdmStock(it)!==null;
+  if(!confirm("从兑换记录中彻底删除该条？\n"+(l.cancelled?"（该记录已撤销，删除仅移除历史）":"（将一并恢复其积分影响"+(backTip?"，并退回库存":"")+"）")))return;
+  if(backTip)it.stock=Math.max(0,(rdmStock(it)||0)+(+l.qty||1));
+  R.logs=R.logs.filter(x=>x.id!==id);
+  save();refresh();
+  toast("已删除该记录");
+};
 /* ---- 兑换弹窗 ---- */
 W.redeemItem=id=>{
   const it=rdmItem(id);if(!it){toast("项目不存在");return;}
