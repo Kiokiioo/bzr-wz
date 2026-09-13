@@ -4874,6 +4874,30 @@ async function cloudSyncNow(){
   const t=el?el.textContent:"";
   toast(t.indexOf("失败")>=0?"同步失败，请看状态提示":"已同步");
 }
+/* 运行期周期拉取：已启用同步且连上云端后，每 30 秒静默检查云端有无本机未见的更新（remoteAt>baseAt）。
+   有则采用云端刷新；若本机恰有未上传改动（本地 _savedAt 比 baseAt 新），先 cloudPushNow（其内再判冲突），
+   避免「后保存为准」下盲目覆盖本地未保存改动。用户正在编辑弹窗（#mask.show）时跳过本次。 */
+async function cloudPoll(){
+  const c=cloudCfg();
+  if(!cloudReadyEnough(c)||!cloudReady||cloudBusy)return;
+  const mask=document.getElementById("mask");
+  if(mask&&mask.classList.contains("show"))return;/* 用户正在编辑，稍后同步 */
+  cloudBusy=true;
+  try{
+    const r=await cloudPullRemote(c);
+    if(r.empty)return;
+    const remoteAt=(r.data&&r.data._savedAt)||0;
+    if(remoteAt>(c.baseAt||0)){
+      if((S._savedAt||0)>(c.baseAt||0)){
+        await cloudPushNow();/* 本机有未上传改动：先尝试上传（云端仍新则该函会采用云端） */
+      }else{
+        await adoptRemoteData(r);
+        toast("已从云端同步其他设备的更新");
+      }
+    }
+  }catch(e){/* 轮询静默：不刷状态、不打扰 */}
+  finally{cloudBusy=false;}
+}
 async function cloudTest(){
   const c=cloudCfg();
   if(!c.token||!c.owner||!c.repo){cloudStatus("err","请先填 Token、用户名、仓库名");return;}
@@ -5057,6 +5081,7 @@ function init(){
   if(location.hash&&location.hash!=="#home")history.replaceState(null,"",location.pathname+location.search+"#home");
   route();
   bootCloudSync();/* 已启用云端同步时，启动即拉取云端最新数据 */
+  setInterval(cloudPoll,30000);/* 页面开着时每 30 秒静默拉取云端，发现其他设备更新即采用 */
 }
 init();
 </script>
