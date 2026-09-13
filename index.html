@@ -1455,7 +1455,7 @@ function gradeRankBucket(r,m){
   return "";
 }
 /* 按规则为该考试生成自动记录。幂等：先撤销这场考试上次生成的自动记录（含积分与日志），再重建。
-   返回值 = 生成的记录条数。每人每科生成 1 条记录，事由里写清 具体考试 + 具体科目 + 名次/退步明细。 */
+   返回值 = 生成的记录条数。每人每科每个计分项生成 1 条记录，事由里写清 具体考试 + 具体科目 + 名次/退步/进步明细。 */
 function applyGradeRules(ex){
   ensureGradeType();
   const R=gradeRules();
@@ -1503,29 +1503,21 @@ function applyGradeRules(ex){
   Object.keys(det).forEach(id=>{
     Object.keys(det[id]).forEach(sub=>{
       const o=det[id][sub];
-      let reason="",sum=0;
-      if(o.bk&&R[o.bk]){
-        const pts=R[o.bk];
-        reason+=sub+"第"+o.rk;
-        sum+=pts;
-      }
-      if(o.drop&&R.drop){
-        reason+=(reason?"；":"")+sub+"退步"+o.drop+"分";
-        sum+=R.drop;
-      }
-      if(o.up&&R.up){
-        reason+=(reason?"；":"")+sub+"进步"+o.up+"分";
-        sum+=R.up;
-      }
-      if(!sum)return;
-      const full=ex.name+" "+reason;
-      const b={id:uid(),studentId:id,type:GRADE_TYPE,reason:full,time,delta:sum,auto:GRADE_TYPE,examId:ex.id};
-      S.behaviors.push(b);
-      if(on){
-        S.points.scores[id]=(S.points.scores[id]||0)+sum;
-        S.points.logs.push({id:uid(),studentId:id,delta:sum,reason:"行为·"+GRADE_TYPE+"："+full,time,behId:b.id,auto:GRADE_TYPE,examId:ex.id});
-      }
-      n++;
+      const items=[];
+      if(o.bk&&R[o.bk]) items.push({reason:sub+"第"+o.rk, delta:R[o.bk]});
+      if(o.drop&&R.drop) items.push({reason:sub+"退步"+o.drop+"分", delta:R.drop});
+      if(o.up&&R.up) items.push({reason:sub+"进步"+o.up+"分", delta:R.up});
+      items.forEach(it=>{
+        if(!it.delta) return;
+        const full=ex.name+" "+it.reason;
+        const b={id:uid(),studentId:id,type:GRADE_TYPE,reason:full,time,delta:it.delta,auto:GRADE_TYPE,examId:ex.id};
+        S.behaviors.push(b);
+        if(on){
+          S.points.scores[id]=(S.points.scores[id]||0)+it.delta;
+          S.points.logs.push({id:uid(),studentId:id,delta:it.delta,reason:"行为·"+GRADE_TYPE+"："+full,time,behId:b.id,auto:GRADE_TYPE,examId:ex.id});
+        }
+        n++;
+      });
     });
   });
   return n;
@@ -2124,7 +2116,7 @@ W.showPersonLogs=id=>{
   const ls=logsOfIds([id]).slice().reverse();
   const sum=ls.reduce((a,l)=>a+(+l.delta||0),0);
   openModal(`<h3>${esc(s.name)} 的积分明细</h3>
-  <div class="tiny muted" style="margin:2px 0 6px">${esc(s.g?s.g+" · ":"")}${esc(s.no||"")}号 · ${esc(ptDetailAll?"全部记录":ptRangeLabel())} · ${ls.length} 条 · 积分 <b style="color:${sum<0?'var(--bad)':'var(--ok)'}">${sum}</b> · 可兑换 <b style="color:var(--brand-ink)">${rdmBalance(id)}</b></div>
+  <div class="tiny muted" style="margin:2px 0 6px">${s.g?`<span style="color:var(--brand);font-weight:500">${esc(s.g)}</span> · `:""}${s.no?esc(s.no)+"号 · ":""}${esc(ptDetailAll?"全部记录":ptRangeLabel())} · ${ls.length} 条 · 积分 <b style="color:${sum<0?'var(--bad)':'var(--ok)'}">${sum}</b> · 可兑换 <b style="color:var(--brand-ink)">${rdmBalance(id)}</b></div>
   ${detailHead()}
   <div style="max-height:48vh;overflow:auto;margin-top:4px">${logListHtml(ls,false)}</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
@@ -2178,7 +2170,7 @@ function viewPoints(v){
     <div class="card pad">
       <div class="between row" style="margin-bottom:10px"><span class="section-title" style="margin:0">个人积分榜<span class="tiny muted" style="font-weight:400;margin-left:6px">点姓名看明细</span></span></div>
       ${person.map((p,i)=>`<div class="pt-row"><span class="pt-rank ${i<3?'top':''}">${i+1}</span>
-        <span class="pt-name pt-link" onclick="W.showPersonLogs('${p.s.id}')" title="查看 ${esc(p.s.name)} 的积分记录">${esc(p.s.name)} <span class="tiny muted">${esc(p.s.g)}组 · ${esc(p.s.no)}号</span></span>
+        <span class="pt-name pt-link" onclick="W.showPersonLogs('${p.s.id}')" title="查看 ${esc(p.s.name)} 的积分记录">${esc(p.s.name)}${p.s.g||p.s.no?` <span class="tiny muted">${p.s.g?`<span style="color:var(--brand);font-weight:500">${esc(p.s.g)}</span>${p.s.no?" · ":""}`:""}${p.s.no?esc(p.s.no)+"号":""}</span>`:""}</span>
         <span class="pt-score" style="color:${p.score<0?'var(--bad)':'var(--ok)'}">${p.score}
           <small class="pt-rdm" title="可兑换积分（用于积分兑换，不改动上方积分）">兑 ${rdmBalance(p.s.id)}</small></span>
         <span class="pt-btns">
