@@ -46,23 +46,24 @@ input,select,textarea{font-family:inherit;font-size:14px}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 
-/* layout */
-.app{display:grid;grid-template-columns:var(--nav-w) 1fr;height:100vh;min-height:0}
-.side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-/* 注意：侧边栏 Logo 用 .sb-brand，切勿写成 .brand——.brand 是 chip 的选中态变体（.chip.brand），同名会互相污染 */
-.sb-brand{display:flex;align-items:center;gap:10px;padding:16px 16px 12px;font-weight:700;font-size:16px}
+/* layout —— 桌面：导航条横在顶端一行；手机（≤767px）：隐藏顶栏，用底部导航 */
+.app{display:flex;flex-direction:column;height:100vh;min-height:0}
+.side{background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:row;align-items:center;flex:none;height:54px;padding:0 14px;gap:4px}
+/* 注意：Logo 用 .sb-brand，切勿写成 .brand——.brand 是 chip 的选中态变体（.chip.brand），同名会互相污染 */
+.sb-brand{display:flex;align-items:center;gap:10px;padding:0 10px 0 0;font-weight:700;font-size:16px;flex:none}
 .sb-brand .logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
-.nav{flex:1;overflow:auto;padding:6px 8px}
-.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;margin-bottom:2px}
+.nav{flex:1;overflow:auto;display:flex;align-items:center;gap:2px;padding:5px 8px;min-width:0;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;white-space:nowrap;flex:none}
 .nav a .ic{width:22px;text-align:center;font-size:16px;flex:none}
 .nav a:hover{background:var(--panel-2)}
 .nav a.active{background:var(--brand);color:var(--bg);font-weight:700;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 40%,transparent)}
 .nav a.active:hover{background:var(--brand)}
-.side-foot{padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center}
+.side-foot{padding:0 0 0 6px;display:flex;gap:8px;align-items:center;flex:none}
 .icon-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;width:34px;height:34px;display:grid;place-items:center;color:var(--ink-2);font-size:15px}
 .icon-btn:hover{color:var(--ink)}
 
-.main{min-width:0;display:flex;flex-direction:column;height:100vh}
+.main{min-width:0;flex:1;display:flex;flex-direction:column;min-height:0}
 .topbar{height:58px;flex:none;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid var(--line);background:var(--panel)}
 .topbar h1{font-size:17px;margin:0;font-weight:700}
 .topbar .sub{color:var(--ink-2);font-size:12.5px}
@@ -432,15 +433,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .more-sheet .ttl{padding:8px 10px;color:var(--ink-2);font-size:12px;font-weight:700}
 
 @media(max-width:1199px){
-  .app{grid-template-columns:64px 1fr}
+  /* 中等宽度桌面：顶栏导航只留图标 */
   .sb-brand .txt,.nav a .tx,.side-foot .tx{display:none}
-  .sb-brand{justify-content:center;padding:16px 0 12px}
-  .nav a{justify-content:center;padding:11px 0}
 }
 @media(max-width:767px){
   /* iOS 防自动放大：输入框字号必须 ≥16px，否则 Safari 会在聚焦瞬间把整页放大 */
   input,select,textarea,input.fld,select.fld,textarea.fld{font-size:16px}
-  .app{grid-template-columns:1fr;height:auto;min-height:100vh;overflow-x:hidden}
+  .app{height:auto;min-height:100vh;overflow-x:hidden}
   .side{display:none}
   .main{height:auto;padding-bottom:64px;min-width:0}
   .topbar{position:sticky;top:0;z-index:20;padding:0 14px;gap:8px;min-width:0;background:var(--bg);border-bottom:none}
@@ -546,9 +545,10 @@ const GRADE_RULE_LABELS=[
   ["top20","单科 11–20 名"],
   ["bot10","单科后十（倒数 1–10 名）"],
   ["bot20","单科后 11–20 名"],
-  ["drop","单科退步 ≥ 5 分（与上一场比）"]
+  ["drop","单科退步 ≥ 5 分（与上一场比）"],
+  ["up","单科进步 ≥ 5 分（与上一场比）"]
 ];
-const DEFAULT_GRADE_RULES=()=>({top10:2,top20:1,bot10:-2,bot20:-1,drop:-1});
+const DEFAULT_GRADE_RULES=()=>({top10:2,top20:1,bot10:-2,bot20:-1,drop:-1,up:1});
 function btype(k){const arr=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());const t=arr.find(x=>x.k===k);return t||{k,c:"brand",pts:0};}
 /* 积分兑换：分类 cats / 奖励项目 items / 兑换记录 logs。stock 为 null 表示不限量 */
 const DEFAULT_REDEEM=()=>({
@@ -923,7 +923,11 @@ function viewHome(v){
         <span class="section-title" style="margin:0">今天待办</span>
         <a class="chip brand" href="#todos" style="text-decoration:none">查看全部</a>
       </div>
-      ${today.length?today.slice(0,3).map(t=>taskLine(t)).join(""):`<div class="empty"><div class="big">🎉</div>今天的待办都清空啦</div>`}
+      ${today.length?today.map(t=>taskLine(t)).join(""):`<div class="empty"><div class="big">🎉</div>今天的待办都清空啦</div>`}
+      <div class="row" style="gap:6px;margin-top:10px">
+        <input class="fld h30" id="homeTaskInput" style="flex:1;min-width:0" placeholder="添加今日待办，回车提交…" onkeydown="if(event.key==='Enter')W.addHomeTask()">
+        <button class="btn h30" style="flex:none" onclick="W.addHomeTask()">添加</button>
+      </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)" class="small muted">本周还有 ${week.length} 项待办</div>
     </div>
     <div class="card pad">
@@ -947,6 +951,16 @@ function viewHome(v){
     ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
   </div>`;
 }
+W.addHomeTask=()=>{
+  const i=$("#homeTaskInput");if(!i)return;
+  const v=i.value.trim();if(!v){toast("请输入待办内容");return;}
+  const item={id:uid(),text:v,done:false,dropped:false,type:"日常",repN:0,repU:"天",repeatEnd:"",list:"今天",priority:"",due:todayStr(),date:"",cat:""};
+  S.todos.unshift(item);save();
+  i.value="";
+  viewHome(document.getElementById("view"));
+  const nw=$("#homeTaskInput");if(nw)nw.focus();
+  toast("已添加到今日待办");
+};
 function buildRecent(){
   const list=[];
   S.behaviors.forEach(b=>{
@@ -1419,8 +1433,12 @@ function gradeRules(){
     const v=parseInt(S.gradeRules[k],10);
     S.gradeRules[k]=isFinite(v)?Math.max(-99,Math.min(99,v)):d[k];
   });
+  /* 开关：成绩积分是否计入总积分（老数据无此键，默认开） */
+  if(S.gradeRules.gradeOn===undefined)S.gradeRules.gradeOn=true;
   return S.gradeRules;
 }
+/* 开关读取：默认开 */
+function gradeOn(){return gradeRules().gradeOn!==false;}
 /* 保证「成绩」类别存在（老数据没有，按需补上） */
 function ensureGradeType(){
   const arr=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
@@ -1441,22 +1459,24 @@ function gradeRankBucket(r,m){
 function applyGradeRules(ex){
   ensureGradeType();
   const R=gradeRules();
-  /* 1) 撤销旧记录：先扣回积分，再删行为与积分日志 */
+  const on=gradeOn();/* 开关：关 → 只生成行为记录留痕，不写积分 */
+  /* 1) 撤销旧记录：先扣回积分（开关关时积分本就不在账上，不扣），再删行为与积分日志 */
   S.behaviors.filter(b=>b.auto===GRADE_TYPE&&b.examId===ex.id).forEach(b=>{
     const d=b.delta||0;
-    if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
+    if(d&&on)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
   });
   S.behaviors=S.behaviors.filter(b=>!(b.auto===GRADE_TYPE&&b.examId===ex.id));
   S.points.logs=S.points.logs.filter(l=>!(l.auto===GRADE_TYPE&&l.examId===ex.id));
-  /* 2) 逐科算名次档位与退步，按 学生×科目 聚合 */
+  /* 2) 逐科算名次档位与进退步，按 学生×科目 聚合 */
   const prev=prevExam(ex);
-  const det={};/* sid -> sub -> {rk,bk,drop} */
-  const add=(sid,sub,rk,bk,dropAmt)=>{
+  const det={};/* sid -> sub -> {rk,bk,drop,up} */
+  const add=(sid,sub,rk,bk,dropAmt,upAmt)=>{
     if(!det[sid])det[sid]={};
     const o=det[sid][sub]||(det[sid][sub]={});
     if(rk!==undefined)o.rk=rk;
     if(bk)o.bk=bk;
     if(dropAmt!==undefined)o.drop=dropAmt;
+    if(upAmt!==undefined)o.up=upAmt;
   };
   ex.subjects.forEach(sub=>{
     const rm=subjRankMap(ex,sub);
@@ -1469,11 +1489,14 @@ function applyGradeRules(ex){
       if(prev){
         const cu=+((ex.scores[id]||{})[sub]);
         const ol=+((prev.scores[id]||{})[sub]);
-        if(isFinite(cu)&&isFinite(ol)&&(ol-cu)>=5)add(id,sub,undefined,undefined,(ol-cu));
+        if(isFinite(cu)&&isFinite(ol)){
+          if((ol-cu)>=5)add(id,sub,undefined,undefined,(ol-cu));
+          else if((cu-ol)>=5)add(id,sub,undefined,undefined,undefined,(cu-ol));
+        }
       }
     });
   });
-  /* 3) 生成记录：每人每科一条，事由 = 具体考试 + 具体科目 + 名次/退步明细（分值全 0 不生成） */
+  /* 3) 生成记录：每人每科一条，事由 = 具体考试 + 具体科目 + 名次/进退步明细（分值全 0 不生成） */
   /* 记录时间 = 考试日期（而非录入时刻），与行为/积分页时间范围过滤兼容 */
   const time=ex.date||nowStr();
   let n=0;
@@ -1490,17 +1513,45 @@ function applyGradeRules(ex){
         reason+=(reason?"；":"")+sub+"退步"+o.drop+"分";
         sum+=R.drop;
       }
+      if(o.up&&R.up){
+        reason+=(reason?"；":"")+sub+"进步"+o.up+"分";
+        sum+=R.up;
+      }
       if(!sum)return;
       const full=ex.name+" "+reason;
       const b={id:uid(),studentId:id,type:GRADE_TYPE,reason:full,time,delta:sum,auto:GRADE_TYPE,examId:ex.id};
       S.behaviors.push(b);
-      S.points.scores[id]=(S.points.scores[id]||0)+sum;
-      S.points.logs.push({id:uid(),studentId:id,delta:sum,reason:"行为·"+GRADE_TYPE+"："+full,time,behId:b.id,auto:GRADE_TYPE,examId:ex.id});
+      if(on){
+        S.points.scores[id]=(S.points.scores[id]||0)+sum;
+        S.points.logs.push({id:uid(),studentId:id,delta:sum,reason:"行为·"+GRADE_TYPE+"："+full,time,behId:b.id,auto:GRADE_TYPE,examId:ex.id});
+      }
       n++;
     });
   });
   return n;
 }
+/* 开关切换后同步既有成绩自动记录的积分：关 → 扣回积分并删日志（行为记录留痕）；开 → 按行为记录补回积分与日志 */
+function syncGradePoints(){
+  const on=gradeOn();
+  const bs=S.behaviors.filter(b=>b.auto===GRADE_TYPE);
+  if(!on){
+    bs.forEach(b=>{const d=b.delta||0;if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;});
+    S.points.logs=S.points.logs.filter(l=>l.auto!==GRADE_TYPE);
+  }else{
+    bs.forEach(b=>{
+      const d=b.delta||0;if(!d)return;
+      S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)+d;
+      if(!S.points.logs.some(l=>l.behId===b.id))S.points.logs.push({id:uid(),studentId:b.studentId,delta:d,reason:"行为·"+GRADE_TYPE+"："+(b.reason||""),time:b.time,behId:b.id,auto:GRADE_TYPE,examId:b.examId});
+    });
+  }
+}
+W.toggleGradeOn=()=>{
+  const R=gradeRules();
+  R.gradeOn=!(R.gradeOn!==false);
+  syncGradePoints();
+  save();W.renderBehTypes();
+  toast(R.gradeOn?"成绩积分已计入总积分":"成绩积分已不计入总积分（行为记录保留）");
+};
 W.setGradeRule=(k,val)=>{
   if(!GRADE_RULE_LABELS.some(([kk])=>kk===k))return;
   const R=gradeRules();
@@ -1587,16 +1638,16 @@ function viewBehavior(v){
   const bv=S.behView||(S.behView={mode:"week",custom:{s:"",e:""}});
   const _b=ptRangeBounds(bv);
   let list=S.behaviors.slice().sort((a,b)=>(b.time||"").localeCompare(a.time||""));
-  /* 时间范围：选项与积分页完全一致（最近一周 / 最近一月 / 全部时间 / 未归档学期 / 自定义） */
+  /* 时间范围：选项与积分页完全一致（最近一周 / 最近一月 / 已设学期 / 所有时间 / 自定义） */
   if(_b)list=list.filter(b=>{const ds=(b.time||"").slice(0,10);return ds&&ds>=_b.s&&ds<=_b.e;});
   if(behFilter)list=list.filter(b=>b.type===behFilter);
   if(behKw){const k=behKw.toLowerCase();list=list.filter(b=>(studentName(b.studentId)+b.reason+b.type).toLowerCase().includes(k));}
   const bopt=(val,label)=>`<option value="${esc(val)}" ${bv.mode===val?"selected":""}>${esc(label)}</option>`;
   const bTermList=(S.terms||[]).filter(t=>t&&!t.archived);
   const behRangeSel=`<select class="fld h30" style="width:120px;flex:none" onchange="W.setBehRange(this.value)" title="时间范围">
-      ${bopt("week","最近一周")}${bopt("month","最近一月")}${bopt("all","全部时间")}
-      ${bTermList.length?`<optgroup label="未归档学期">${bTermList.map(t=>bopt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
-      ${bopt("custom","自定义…")}
+      ${bopt("week","最近一周")}${bopt("month","最近一月")}
+      ${bTermList.length?`<optgroup label="已设学期">${bTermList.map(t=>bopt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
+      ${bopt("all","所有时间")}${bopt("custom","自定义…")}
     </select>`;
   const behCustomBox=bv.mode==="custom"?`<span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).s||"")}" onchange="W.setBehCustom('s',this.value)">
       <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).e||"")}" onchange="W.setBehCustom('e',this.value)">`:"";
@@ -1990,7 +2041,7 @@ let ptTab="person";
 let redeemCatFilter="all";
 /* 积分页时间范围：
    week = 本周一 ~ 今天（按周，不是 7 天）；month = 本月 1 日 ~ 今天（按自然月，不是 30 天）；
-   all  = 所有「未归档」学期的起止范围；t:<id> = 指定未归档学期；custom = 自定义起止。
+   all  = 所有时间（不筛选，显示全部记录）；t:<id> = 指定未归档学期；custom = 自定义起止。
    返回 {s,e}（YYYY-MM-DD，含端点）；null = 不限（全部记录）。 */
 /* 传 pvOverride 可按别的时间范围状态计算（行为记录页用 S.behView）；不传则用积分页 S.pointView */
 function ptRangeBounds(pvOverride){
@@ -2003,12 +2054,7 @@ function ptRangeBounds(pvOverride){
     return {s:fmt(s),e:t};
   }
   if(pv.mode==="month")return {s:t.slice(0,8)+"01",e:t};
-  if(pv.mode==="all"){
-    const ts=(S.terms||[]).filter(x=>x&&!x.archived&&x.start);
-    if(!ts.length)return null;
-    const ss=ts.map(x=>x.start).sort(),ee=ts.map(x=>x.end||t).sort();
-    return {s:ss[0],e:ee[ee.length-1]};
-  }
+  if(pv.mode==="all")return null; /* 所有时间：不筛选，显示全部记录 */
   if(pv.mode==="custom"){const c=pv.custom||{};return {s:c.s||"0000-01-01",e:c.e||"9999-12-31"};}
   if(String(pv.mode).indexOf("t:")===0){
     const tr=el(String(pv.mode).slice(2),S.terms||[]);
@@ -2019,7 +2065,7 @@ function ptRangeBounds(pvOverride){
 const ptModeName=m=>{
   if(m==="week")return "最近一周";
   if(m==="month")return "最近一月";
-  if(m==="all")return "全部时间";
+  if(m==="all")return "所有时间";
   if(m==="custom")return "自定义";
   const tr=el(String(m).slice(2),S.terms||[]);
   return tr?tr.name:"最近一周";
@@ -2027,7 +2073,7 @@ const ptModeName=m=>{
 function ptRangeLabel(pvOverride){
   const _pv=pvOverride||S.pointView||{mode:"week",custom:{s:"",e:""}};
   const b=ptRangeBounds(_pv),m=ptModeName(_pv.mode);
-  if(!b)return m+"（全部记录）";
+  if(!b)return m;
   const s=b.s==="0000-01-01"?"起":b.s,e=b.e==="9999-12-31"?"今":b.e;
   return `${m}（${s} ~ ${e}）`;
 }
@@ -2111,9 +2157,9 @@ function viewPoints(v){
   const termList=(S.terms||[]).filter(t=>t&&!t.archived);
   const opt=(val,label)=>`<option value="${esc(val)}" ${pv.mode===val?"selected":""}>${esc(label)}</option>`;
   const rangeSel=`<select class="fld h30" style="flex:1;min-width:120px" onchange="W.setPtRange(this.value)" title="统计范围">
-      ${opt("week","最近一周")}${opt("month","最近一月")}${opt("all","全部时间")}
-      ${termList.length?`<optgroup label="未归档学期">${termList.map(t=>opt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
-      ${opt("custom","自定义…")}
+      ${opt("week","最近一周")}${opt("month","最近一月")}
+      ${termList.length?`<optgroup label="已设学期">${termList.map(t=>opt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
+      ${opt("all","所有时间")}${opt("custom","自定义…")}
     </select>`;
   const customBox=pv.mode==="custom"?`<span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).s||"")}" onchange="W.setPtCustom('s',this.value)">
       <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).e||"")}" onchange="W.setPtCustom('e',this.value)">`:"";
@@ -2746,7 +2792,7 @@ W.delGAdd=id=>{
   if(!confirm(`删除「${ex.name}」及全部成绩？该考试的自动加减分记录会一并撤销。`))return;
   S.behaviors.filter(b=>b.auto===GRADE_TYPE&&b.examId===ex.id).forEach(b=>{
     const d=b.delta||0;
-    if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
+    if(d&&gradeOn())S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
   });
   S.behaviors=S.behaviors.filter(b=>!(b.auto===GRADE_TYPE&&b.examId===ex.id));
   S.points.logs=S.points.logs.filter(l=>!(l.auto===GRADE_TYPE&&l.examId===ex.id));
@@ -2857,20 +2903,22 @@ W.doEditBehavior=id=>{
   if(type && !(Array.isArray(S.behTypes)?S.behTypes:[]).some(t=>t.k===type)){
     (Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES())).push({k:type,c:b.delta<0?"bad":b.delta>0?"ok":"brand",pts:b.delta});
   }
-  const diff=b.delta-oldDelta;
+  /* 成绩自动记录在「不计入总积分」时按 0 参与：编辑不写积分、删日志不留脏数据 */
+  const counts=b.auto!==GRADE_TYPE||gradeOn();
+  const diff=(counts?b.delta:0)-(counts?oldDelta:0);
   if(diff){
     if(oldSid!==b.studentId){S.points.scores[oldSid]=(S.points.scores[oldSid]||0)-oldDelta;S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)+b.delta;}
     else S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)+diff;
   }
   const lg=S.points.logs.find(l=>l.behId===id);
   if(lg){lg.studentId=b.studentId;lg.delta=b.delta;lg.reason="行为·"+b.type+(b.reason?"："+b.reason:"");}
-  else if(b.delta){S.points.logs.push({id:uid(),studentId:b.studentId,delta:b.delta,reason:"行为·"+b.type+(b.reason?"："+b.reason:""),time:b.time,behId:id});}
+  else if(b.delta&&counts){S.points.logs.push({id:uid(),studentId:b.studentId,delta:b.delta,reason:"行为·"+b.type+(b.reason?"："+b.reason:""),time:b.time,behId:id});}
   save();closeModal();refresh();toast("已修改");
 };
 W.delBehavior=id=>{
   const b=el(id,S.behaviors);if(!b)return;
   const d=b.delta||0;
-  if(d)S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
+  if(d&&(b.auto!==GRADE_TYPE||gradeOn()))S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)-d;
   S.points.logs=S.points.logs.filter(l=>l.behId!==id);
   S.behaviors=S.behaviors.filter(x=>x.id!==id);
   save();refresh();toast(d?"已删除，积分扣回 "+(d>0?"+"+d:d):"已删除");
@@ -2898,6 +2946,9 @@ W.manageBehTypes=()=>{
   <div style="border-top:1px solid var(--line);margin:14px 0 4px"></div>
   <div class="section-title" style="margin:8px 0 6px">成绩规则</div>
   <div class="tiny muted" style="margin-bottom:8px">导入成绩后按此自动录入「${GRADE_TYPE}」记录（每人每场考试合并成 1 条，事由里列各科明细）。同一场考试重新导入会覆盖上次的自动记录，不会重复计分。</div>
+  <div class="r-item" style="padding:7px 0">
+    <span style="flex:1;min-width:0;font-size:13px">成绩积分计入总积分</span>
+    <button class="btn sm h30 ${gradeOn()?"":"ghost"}" onclick="W.toggleGradeOn()" title="开：成绩自动记分计入总积分；关：只保留行为记录，不计入总积分">${gradeOn()?"开":"关"}</button></div>
   ${GRADE_RULE_LABELS.map(ruleRow).join("")}`);
 };
 W.renameBehType=(old,nv)=>{
@@ -2967,6 +3018,9 @@ function viewBehTypes(v){
     <div style="border-top:1px solid var(--line);margin:14px 0 4px"></div>
     <div class="section-title" style="margin:8px 0 6px">成绩规则</div>
     <div class="tiny muted" style="margin-bottom:8px">导入成绩后按此自动录入「${GRADE_TYPE}」记录（每人每场考试合并成 1 条，事由里列各科明细）。同一场考试重新导入会覆盖上次的自动记录，不会重复计分。</div>
+    <div class="r-item" style="padding:7px 0">
+      <span style="flex:1;min-width:0;font-size:13px">成绩积分计入总积分</span>
+      <button class="btn sm h30 ${gradeOn()?"":"ghost"}" onclick="W.toggleGradeOn()" title="开：成绩自动记分计入总积分；关：只保留行为记录，不计入总积分">${gradeOn()?"开":"关"}</button></div>
     ${GRADE_RULE_LABELS.map(ruleRow).join("")}
   </div>`;
 }
@@ -2975,6 +3029,7 @@ W.exportBehTypes=()=>{
   const R=gradeRules();
   const cfg={behTypes:(S.behTypes||[]).map(t=>({k:t.k,c:t.c,pts:t.pts})),gradeRules:{}};
   GRADE_RULE_LABELS.forEach(([k])=>cfg.gradeRules[k]=R[k]);
+  cfg.gradeRules.gradeOn=R.gradeOn!==false;
   downloadJSON("行为类别配置",cfg);
 };
 W.importBehTypes=()=>{
@@ -2990,7 +3045,7 @@ function applyBehTypesText(text){
     const cfg=JSON.parse(text);
     if(!cfg||!Array.isArray(cfg.behTypes)){toast("文件格式不正确");return false;}
     S.behTypes=cfg.behTypes.map(t=>({k:String(t.k||"").trim(),c:t.c||"brand",pts:Math.max(-99,Math.min(99,parseInt(t.pts,10)||0))})).filter(t=>t.k);
-    if(cfg.gradeRules&&typeof cfg.gradeRules==="object"){const R=gradeRules();GRADE_RULE_LABELS.forEach(([k])=>{if(k in cfg.gradeRules)R[k]=Math.max(-99,Math.min(99,parseInt(cfg.gradeRules[k],10)||0));});}
+    if(cfg.gradeRules&&typeof cfg.gradeRules==="object"){const R=gradeRules();const on0=gradeOn();GRADE_RULE_LABELS.forEach(([k])=>{if(k in cfg.gradeRules)R[k]=Math.max(-99,Math.min(99,parseInt(cfg.gradeRules[k],10)||0));});if("gradeOn" in cfg.gradeRules)R.gradeOn=!!cfg.gradeRules.gradeOn;if(gradeOn()!==on0)syncGradePoints();}
     ensureGradeType();save();closeModal();W.renderBehTypes();toast("已导入 "+S.behTypes.length+" 个类别");
     return true;
   }catch(e){toast("解析失败：文件不是有效 JSON");return false;}
@@ -4998,6 +5053,8 @@ function init(){
   /* 切后台/锁屏/关页前，把防抖中尚未上传的改动立即推上云端，避免「改完马上关页」丢同步 */
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;cloudPushNow();}});
   window.addEventListener("hashchange",route);
+  /* 每次打开默认进入首页：清掉浏览器残留的 hash（replaceState 不产生历史记录、不触发多余渲染） */
+  if(location.hash&&location.hash!=="#home")history.replaceState(null,"",location.pathname+location.search+"#home");
   route();
   bootCloudSync();/* 已启用云端同步时，启动即拉取云端最新数据 */
 }
