@@ -497,6 +497,20 @@ table.tbl.roster th.sortable{padding:9px 4px}
   *{scrollbar-width:none}
   *::-webkit-scrollbar{display:none}
 }
+/* 首页·今日课程卡片 */
+.cls-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
+.cls-row:last-child{border-bottom:none}
+.cls-prd{min-width:62px;display:flex;flex-direction:column;gap:2px}
+.cls-prd b{font-size:13px}
+.cls-time{font-size:11px;color:var(--muted)}
+.cls-subs{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.cls-sub{display:flex;align-items:baseline;gap:8px;padding:4px 0 4px 9px;border-left:3px solid var(--line);border-radius:4px}
+.cls-name{font-size:14px;font-weight:700}
+.cls-name .wtag{font-style:normal;font-size:10px;font-weight:600;color:#fff;background:var(--muted);border-radius:6px;padding:0 4px;margin-left:3px;vertical-align:middle}
+.cls-meta{font-size:12px;color:var(--muted)}
+.cls-tel{display:inline-block;margin-left:4px;font-size:13px;line-height:1.6;color:var(--brand);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
+.cls-tel:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+.cls-tel:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
 </style>
 </head>
 <body data-page-node-id="WKyavnS7yVYO8qWNuXAl2D">
@@ -786,16 +800,16 @@ function clearAllAsk(){
 /* ============ nav ============ */
 const NAV=[
   {r:"home",t:"首页",ic:"🏠"},
-  {r:"schedule",t:"课表",ic:"📅"},
-  {r:"roster",t:"学生名册",ic:"👥"},
   {r:"seating",t:"排位",ic:"🪑"},
   {r:"todos",t:"事务安排",ic:"✅"},
   {r:"behavior",t:"行为记录",ic:"📝"},
   {r:"behtypes",t:"行为类别",ic:"🏷️",hide:true},
   {r:"grades",t:"成绩管理",ic:"📊"},
+  {r:"roster",t:"学生名册",ic:"👥"},
   {r:"points",t:"积分",ic:"⭐"},
   {r:"lottery",t:"抽签",ic:"🎲"},
   {r:"tiers",t:"学生等级",ic:"🏅"},
+  {r:"schedule",t:"课表",ic:"📅"},
   {r:"jobs",t:"班级工作",ic:"🧹"},
   {r:"data",t:"数据",ic:"🗄️"}
 ];
@@ -946,6 +960,7 @@ function viewHome(v){
       </div>
     </div>
   </div>
+  ${todayLessonsCard()}
   <div class="card pad recent" style="margin-top:14px">
     <div class="section-title">最近记录</div>
     ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
@@ -961,6 +976,97 @@ W.addHomeTask=()=>{
   const nw=$("#homeTaskInput");if(nw)nw.focus();
   toast("已添加到今日待办");
 };
+/* 今日课程：返回今天（按本地星期）各节次的课程列表，供首页卡片展示。
+   复用课表的 cells 键 "周几-节次"、cellEntries（单双周分列）、schedWeek（周次奇偶）与 subjColor。 */
+/* 取节次开始时间的小时（含分钟）用于分上午/下午/晚上；无法解析返回 null */
+function startHour(t){
+  if(!t)return null;
+  const m=String(t).match(/^\s*(\d{1,2}):(\d{2})/);
+  if(!m)return null;
+  return (+m[1])+(+m[2])/60;
+}
+/* 今日课程：按本地星期取今天课程，并按上课时间分桶：上午(0:00-12:30)/下午(12:30-17:30)/晚上(17:30-0) */
+function buildTodayLessons(){
+  const SCH=(S.schedule)||{};const cells=SCH.cells||{};const times=SCH.times||{};
+  const todayD=((new Date().getDay()+6)%7)+1; // 1..7，1=周一
+  const wk=schedWeek();
+  if(todayD>5) return {weekend:true,week:wk,groups:{am:[],pm:[],ev:[]}};
+  const per=effectivePeriods();
+  const hasM=Object.keys(cells).some(k=>k.endsWith("-m"));
+  const evRows=["e1","e2","e3"].filter(ek=>Object.keys(cells).some(k=>k.endsWith("-"+ek)));
+  const order=[];
+  if(hasM)order.push("m");
+  for(let p=1;p<=per;p++)order.push(String(p));
+  evRows.forEach(ek=>order.push(ek));
+  const lessons=[];
+  order.forEach(p=>{
+    const c=cells[todayD+"-"+p];
+    if(!c)return;
+    const list=cellEntries(c).filter(([w2])=>!w2||!wk||w2===wk.parity);
+    if(!list.length)return;
+    const subs=list.map(([w2,cc])=>({
+      sub:cc.sub||"",cls:cc.cls||"",tch:cc.tch||"",tel:cc.tel||"",
+      color:subjColor(cc.sub),
+      wtag:w2?(w2==="o"?"单":"双"):""
+    }));
+    lessons.push({p,label:periodLabel(p),time:tRange(times[p]),subs});
+  });
+  // 分桶：m=上午；e*=晚上；数字节次按开始时间（<12:30 上午 / [12:30,17:30) 下午 / ≥17:30 晚上），无时间则按数字节次顺序对半切
+  const groups={am:[],pm:[],ev:[]};
+  const numLessons=lessons.filter(L=>/^\d+$/.test(L.p));
+  const half=Math.ceil(numLessons.length/2);
+  let ni=0;
+  lessons.forEach(L=>{
+    let part;
+    if(L.p==="m")part="am";
+    else if(L.p[0]==="e")part="ev";
+    else{
+      const v=startHour(L.time);
+      if(v!==null)part=v<12.5?"am":v<17.5?"pm":"ev";
+      else part=(ni++<half)?"am":"pm";
+    }
+    groups[part].push(L);
+  });
+  return {weekend:false,week:wk,groups};
+}
+function todayLessonsCard(){
+  const d=buildTodayLessons();
+  const wkTag=d.week?`<span class="chip brand" title="按学期开始日期推算的教学周">第 ${d.week.n} 周 · ${d.week.parity==="o"?"单周":"双周"}</span>`:"";
+  const row=L=>`
+      <div class="cls-row">
+        <div class="cls-prd"><b>${esc(L.label)}</b>${L.time?`<span class="cls-time">${esc(L.time)}</span>`:""}</div>
+        <div class="cls-subs">
+          ${L.subs.map(s=>`
+            <div class="cls-sub" style="border-left-color:${s.color}">
+              <span class="cls-name" style="color:${s.color}">${esc(s.sub)}${s.wtag?`<i class="wtag">${s.wtag}</i>`:""}</span>
+              ${s.cls?`<span class="cls-meta">${esc(s.cls)}</span>`:""}
+              ${s.tch?`<span class="cls-meta">${esc(s.tch)}</span>`:""}
+              ${s.tel?`<a class="cls-tel" href="tel:${esc(s.tel)}" title="拨打 ${esc(s.tch||"老师")} 的电话" aria-label="拨打老师电话">📞</a>`:""}
+            </div>`).join("")}
+        </div>
+      </div>`;
+  // 只显示当前时段（按当前时间）：上午 0:00–12:30 / 下午 12:30–17:30 / 晚上 17:30–24:00
+  const part=(()=>{const h=new Date().getHours()+new Date().getMinutes()/60;return h<12.5?"am":h<17.5?"pm":"ev";})();
+  const partName={am:"上午",pm:"下午",ev:"晚上"}[part];
+  let body;
+  if(d.weekend){
+    body=`<div class="empty"><div class="big">🌿</div>周末愉快，今天没有排课</div>`;
+  }else{
+    const ls=d.groups[part];
+    if(!ls.length){
+      body=`<div class="empty">现在${partName}，今天这一时段还没有排课</div>`;
+    }else{
+      body=ls.map(row).join("");
+    }
+  }
+  return `<div class="card pad" style="margin-top:14px">
+    <div class="between row" style="margin-bottom:12px">
+      <div class="row" style="gap:8px;align-items:center">${wkTag}<span class="section-title" style="margin:0">今日课程</span><span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span></div>
+      <a class="chip brand" href="#schedule" style="text-decoration:none">查看课表</a>
+    </div>
+    ${body}
+  </div>`;
+}
 function buildRecent(){
   const list=[];
   S.behaviors.forEach(b=>{
