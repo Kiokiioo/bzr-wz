@@ -46,20 +46,20 @@ input,select,textarea{font-family:inherit;font-size:14px}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
 
-/* layout —— 桌面：导航条横在顶端一行；手机（≤767px）：隐藏顶栏，用底部导航 */
-.app{display:flex;flex-direction:column;height:100vh;min-height:0}
-.side{background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:row;align-items:center;flex:none;height:54px;padding:0 14px;gap:4px}
+/* layout —— 桌面：左侧固定导航栏（竖排，全部模块带文字常显）；手机（≤767px）：隐藏侧栏，用底部导航 */
+.app{display:flex;flex-direction:row;height:100vh;min-height:0}
+.side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:stretch;flex:none;width:var(--nav-w);height:100vh;padding:14px 10px;gap:6px;overflow:hidden}
 /* 注意：Logo 用 .sb-brand，切勿写成 .brand——.brand 是 chip 的选中态变体（.chip.brand），同名会互相污染 */
-.sb-brand{display:flex;align-items:center;gap:10px;padding:0 10px 0 0;font-weight:700;font-size:16px;flex:none}
-.sb-brand .logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
-.nav{flex:1;overflow:auto;display:flex;align-items:center;gap:2px;padding:5px 8px;min-width:0;scrollbar-width:none}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:6px 8px 14px;font-weight:700;font-size:16px;flex:none;width:100%}
+.sb-brand .logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px;flex:none}
+.nav{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:4px 0;min-width:0;scrollbar-width:none}
 .nav::-webkit-scrollbar{display:none}
-.nav a{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;white-space:nowrap;flex:none}
+.nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;font-weight:500;white-space:nowrap;flex:none;width:100%}
 .nav a .ic{width:22px;text-align:center;font-size:16px;flex:none}
 .nav a:hover{background:var(--panel-2)}
 .nav a.active{background:var(--brand);color:var(--bg);font-weight:700;box-shadow:0 3px 10px color-mix(in srgb,var(--brand) 40%,transparent)}
 .nav a.active:hover{background:var(--brand)}
-.side-foot{padding:0 0 0 6px;display:flex;gap:8px;align-items:center;flex:none}
+.side-foot{margin-top:auto;padding:10px 8px 2px;display:flex;gap:8px;align-items:center;flex:none}
 .icon-btn{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;width:34px;height:34px;display:grid;place-items:center;color:var(--ink-2);font-size:15px}
 .icon-btn:hover{color:var(--ink)}
 
@@ -441,14 +441,10 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .more-sheet a .ic{font-size:16px}
 .more-sheet .ttl{padding:8px 10px;color:var(--ink-2);font-size:12px;font-weight:700}
 
-@media(max-width:1199px){
-  /* 中等宽度桌面：顶栏导航只留图标 */
-  .sb-brand .txt,.nav a .tx,.side-foot .tx{display:none}
-}
 @media(max-width:767px){
   /* iOS 防自动放大：输入框字号必须 ≥16px，否则 Safari 会在聚焦瞬间把整页放大 */
   input,select,textarea,input.fld,select.fld,textarea.fld{font-size:16px}
-  .app{height:auto;min-height:100vh;overflow-x:hidden}
+  .app{height:auto;min-height:100vh;overflow-x:hidden;flex-direction:column}
   .side{display:none}
   .main{height:auto;padding-bottom:64px;min-width:0}
   .topbar{position:sticky;top:0;z-index:20;padding:0 14px;gap:8px;min-width:0;background:var(--bg);border-bottom:none}
@@ -1456,6 +1452,8 @@ function viewGrades(v){
   }
   const arrow=(k)=>gSort&&gSort.k===k?(gSort.dir===1?" ▲":" ▼"):"";
   const thCls=(k)=>gSort&&gSort.k===k?" sortable on":" sortable";
+  /* 重渲前记住列表滚动位置（列表内部 + 页面 + 窗口），渲染后恢复——编辑/排序后停在原处，不跳顶 */
+  const _gOld=v.querySelector(".tbl-scroll"),_gSt=_gOld?_gOld.scrollTop:0,_gVs=v.scrollTop||0,_gWy=window.scrollY||0;
   v.innerHTML=`
   <div class="between row wrap" style="margin-bottom:12px">
     <div class="row" style="gap:8px">
@@ -1507,6 +1505,11 @@ function viewGrades(v){
         <button class="del" onclick="W.delGAdd('${e.id}')" title="删除这场考试及成绩">删</button>
       </span></div>`;}).join("")}
   </div>`;
+  /* 恢复到编辑前的滚动位置（列表内部 + 页面 + 窗口） */
+  const _gNew=v.querySelector(".tbl-scroll");
+  if(_gNew&&_gSt)_gNew.scrollTop=_gSt;
+  if(_gVs)v.scrollTop=_gVs;
+  if(_gWy)window.scrollTo(0,_gWy);
 }
 function gradeRanks(ex){
   const arr=S.students.map(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});return {id:s.id,sum,n};}).filter(x=>x.n).sort((a,b)=>b.sum-a.sum);
