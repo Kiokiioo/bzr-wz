@@ -248,6 +248,10 @@ table.tbl.roster .c-tier .chip{display:inline-flex;align-items:center;gap:5px;pa
 table.tbl.roster .c-tier .chip.tier-a{background:var(--ok-soft);color:var(--ok);border-color:transparent}
 table.tbl.roster .c-tier .chip.tier-b{background:var(--warn-soft);color:var(--warn);border-color:transparent}
 table.tbl.roster .c-tier .chip.tier-c{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+/* 名册：身份证/家庭地址/爱好列放宽并允许换行（地址可能较长） */
+table.tbl.roster .c-idcard{min-width:140px;white-space:nowrap}
+table.tbl.roster .c-addr{max-width:200px;white-space:normal;line-height:1.4}
+table.tbl.roster .c-hobby{max-width:160px;white-space:normal;line-height:1.4}
 /* 成绩表：列间距 4px + 固定列宽（姓名60 / 科目45 / 进退步45 / 排名40 / 总分50）
    width:auto → 表格收缩到列宽总和，不做整表拉伸（避免 fixed 布局按比例放大列宽） */
 table.tbl.grades{width:auto}
@@ -996,7 +1000,7 @@ function startHour(t){
   if(!m)return null;
   return (+m[1])+(+m[2])/60;
 }
-/* 今日课程：按本地星期取今天课程，并按上课时间分桶：上午(0:00-12:30)/下午(12:30-17:30)/晚上(17:30-0) */
+/* 今日课程：按本地星期取今天课程，并按上课时间分桶：上午(0:00-13:00)/下午(13:00-17:30)/晚上(17:30-0) */
 function buildTodayLessons(){
   const SCH=(S.schedule)||{};const cells=SCH.cells||{};const times=SCH.times||{};
   const todayD=((new Date().getDay()+6)%7)+1; // 1..7，1=周一
@@ -1022,7 +1026,7 @@ function buildTodayLessons(){
     }));
     lessons.push({p,label:periodLabel(p),time:tRange(times[p]),subs});
   });
-  // 分桶：m=上午；e*=晚上；数字节次按开始时间（<12:30 上午 / [12:30,17:30) 下午 / ≥17:30 晚上），无时间则按数字节次顺序对半切
+  // 分桶：m=上午；e*=晚上；数字节次按开始时间（<13:00 上午 / [13:00,17:30) 下午 / ≥17:30 晚上），无时间则按数字节次顺序对半切
   const groups={am:[],pm:[],ev:[]};
   const numLessons=lessons.filter(L=>/^\d+$/.test(L.p));
   const half=Math.ceil(numLessons.length/2);
@@ -1033,7 +1037,7 @@ function buildTodayLessons(){
     else if(L.p[0]==="e")part="ev";
     else{
       const v=startHour(L.time);
-      if(v!==null)part=v<12.5?"am":v<17.5?"pm":"ev";
+      if(v!==null)part=v<13.0?"am":v<17.5?"pm":"ev";
       else part=(ni++<half)?"am":"pm";
     }
     groups[part].push(L);
@@ -1056,8 +1060,8 @@ function todayLessonsCard(){
             </div>`).join("")}
         </div>
       </div>`;
-  // 只显示当前时段（按当前时间）：上午 0:00–12:30 / 下午 12:30–17:30 / 晚上 17:30–24:00
-  const part=(()=>{const h=new Date().getHours()+new Date().getMinutes()/60;return h<12.5?"am":h<17.5?"pm":"ev";})();
+  // 只显示当前时段（按当前时间）：上午 0:00–13:00 / 下午 13:00–17:30 / 晚上 17:30–24:00
+  const part=(()=>{const h=new Date().getHours()+new Date().getMinutes()/60;return h<13.0?"am":h<17.5?"pm":"ev";})();
   const partName={am:"上午",pm:"下午",ev:"晚上"}[part];
   let body;
   if(d.weekend){
@@ -1223,15 +1227,18 @@ function taskLine(t){
 /* ============ ROSTER ============ */
 let rosterKw="";
 let rosterSort={k:"",dir:1}; /* k: name/sex/g/tier/phone/height；dir: 1 升 / -1 降；k 为空=录入顺序 */
-/* 列顺序：学号 → 姓名 → 等级 → 家长电话 → 备注 → 学习组 → 性别 → 身高 → 操作
+/* 列顺序：学号 → 姓名 → 等级 → 家长电话 → 学习组 → 身份证 → 家庭地址 → 爱好 → 备注 → 性别 → 身高 → 操作
    k 为空 = 不可排序；导出 CSV 沿用同一顺序 */
 const ROSTER_COLS=[
   {k:"",      t:"学号",     c:"c-no"},
   {k:"name",  t:"姓名",     c:"c-name"},
   {k:"tier",  t:"等级",     c:"c-tier"},
   {k:"",      t:"家长电话", c:"c-phone"},
-  {k:"",      t:"备注",     c:"c-note"},
   {k:"g",     t:"学习组",   c:"c-g"},
+  {k:"",      t:"身份证",   c:"c-idcard"},
+  {k:"",      t:"家庭地址", c:"c-addr"},
+  {k:"",      t:"爱好",     c:"c-hobby"},
+  {k:"",      t:"备注",     c:"c-note"},
   {k:"sex",   t:"性别",     c:"c-sex"},
   {k:"height",t:"身高",     c:"c-h"},
   {k:"",      t:"操作",     c:"c-act"}
@@ -1252,6 +1259,9 @@ function rosterColOn(c){
     "c-phone":()=>S.students.some(s=>phoneList(s.phone).length>0),
     "c-note":()=>S.students.some(s=>String(s.note||"").trim()!==""),
     "c-g":()=>S.students.some(s=>String(s.g||"").trim()!==""),
+    "c-idcard":()=>S.students.some(s=>String(s.idCard||"").trim()!==""),
+    "c-addr":()=>S.students.some(s=>String(s.address||"").trim()!==""),
+    "c-hobby":()=>S.students.some(s=>String(s.hobby||"").trim()!==""),
     "c-sex":()=>S.students.some(s=>String(s.sex||"").trim()!==""),
     "c-h":()=>S.students.some(s=>+s.height>0)
   };
@@ -1344,7 +1354,7 @@ function phoneLink(p){
 }
 function rosterList(){
   let list=S.students.slice();
-  if(rosterKw){const k=rosterKw.toLowerCase();list=list.filter(s=>(s.name+s.no+s.g).toLowerCase().includes(k));}
+  if(rosterKw){const k=rosterKw.toLowerCase();list=list.filter(s=>(s.name+s.no+s.g+(s.idCard||"")+phoneList(s.phone).join("")+(s.address||"")+(s.hobby||"")).toLowerCase().includes(k));}
   const k=rosterSort.k;
   if(k){
     const TIER={A:1,B:2,C:3},dir=rosterSort.dir;
@@ -1360,15 +1370,18 @@ function rosterList(){
 function rosterRows(cols){
   const list=rosterList();
   const CS=cols||ROSTER_COLS.filter(rosterColOn);
-  if(!list.length)return `<tr><td colspan="9"><div class="empty"><div class="big">👥</div>还没有学生，点「添加」或 CSV 导入</div></td></tr>`;
+  if(!list.length)return `<tr><td colspan="${cols.length}"><div class="empty"><div class="big">👥</div>还没有学生，点「添加」或 CSV 导入</div></td></tr>`;
   const TC={A:"tier-a",B:"tier-b",C:"tier-c"};
   const TD={
     "c-no":s=>`<td class="c-no">${esc(s.no)}</td>`,
     "c-name":s=>`<td class="c-name"><b style="cursor:pointer" title="查看最近表现" onclick="W.stuRecent('${s.id}')">${esc(s.name)}</b></td>`,
     "c-tier":s=>`<td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}" style="cursor:pointer" title="查看最近一次考试成绩" onclick="W.stuLastExam('${s.id}')">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>`,
     "c-phone":s=>`<td class="c-phone">${phoneLink(s.phone)}</td>`,
-    "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
     "c-g":s=>`<td class="c-g">${esc(s.g)}</td>`,
+    "c-idcard":s=>`<td class="c-idcard">${esc(s.idCard)||"—"}</td>`,
+    "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}">${esc(s.address)||"—"}</td>`,
+    "c-hobby":s=>`<td class="c-hobby">${esc(s.hobby)||"—"}</td>`,
+    "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
     "c-sex":s=>`<td class="c-sex">${esc(s.sex)}</td>`,
     "c-h":s=>`<td class="c-h">${s.height||"—"}</td>`,
     "c-act":s=>`<td class="c-act"><span class="act"><button class="btn ghost sm h24" onclick="W.editStudent('${s.id}')">编辑</button>
@@ -1495,7 +1508,13 @@ function viewGrades(v){
   </div>
   ${gradeDistHtml(ex)}
   <div class="card pad" style="margin-top:12px">
-    <div class="section-title" style="margin-bottom:6px">考试记录（${S.exams.length}）</div>
+    <div class="between row wrap" style="margin-bottom:6px">
+      <span class="section-title" style="margin:0">考试记录（${S.exams.length}）</span>
+      <div class="row" style="gap:8px">
+        <span style="flex:none;min-width:0;font-size:13px;align-self:center">成绩积分计入总积分</span>
+        <button class="btn sm h30 ${gradeOn()?"":"ghost"}" onclick="W.toggleGradeOn()" title="开：成绩获得的积分计入总积分；关：成绩积分不计入（行为记录保留）">${gradeOn()?"开":"关"}</button>
+      </div>
+    </div>
     ${[...S.exams].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e=>{
       const n=S.students.filter(s=>{const sc=e.scores[s.id]||{};return e.subjects.some(sub=>sc[sub]!==undefined&&sc[sub]!=="");}).length;
       return `<div class="r-item" style="padding:7px 0">
@@ -1754,6 +1773,8 @@ W.toggleGradeOn=()=>{
   R.gradeOn=!(R.gradeOn!==false);
   syncGradePoints();
   save();W.renderBehTypes();
+  /* 成绩管理页内点击开关时同步重渲，使「开/关」标签即时刷新（保留滚动位置） */
+  if(location.hash.indexOf("grades")>=0){const v=document.getElementById("view");if(v)viewGrades(v);}
   toast(R.gradeOn?"成绩积分已计入总积分":"成绩积分已不计入总积分（行为记录保留）");
 };
 W.setGradeRule=(k,val)=>{
@@ -2912,15 +2933,17 @@ W.editStudent=id=>{
     <div class="field row"><div style="flex:1"><label class="lbl">学习组</label><input class="fld" id="m_g" value="${s?esc(s.g):""}"></div>
       <div style="flex:1"><label class="lbl">身高(cm)</label><input class="fld" id="m_h" type="number" value="${s?esc(s.height):""}"></div></div>
     <div class="field row"><div style="flex:1"><label class="lbl">等级（手动，凌驾计算）</label><select class="fld" id="m_tier"><option value="" ${s&&!(s.tier||"")?"selected":""}>按计算</option>${["A","B","C"].map(t=>`<option ${s&&s.tier===t?"selected":""}>${t}</option>`).join("")}</select></div>
-      <div style="flex:1"></div></div>
+      <div style="flex:1"><label class="lbl">身份证</label><input class="fld" id="m_id" value="${s?esc(s.idCard):""}" placeholder="选填"></div></div>
     <div class="field"><label class="lbl">家长电话</label><input class="fld" id="m_phone" value="${s?esc(s.phone):""}" placeholder="多个电话用逗号或空格分隔"></div>
     <div class="tiny muted" style="margin:-4px 0 10px">可填多个，如「13800000000,13900000000」；名册里分行显示，点任一个直接拨号。</div>
+    <div class="field"><label class="lbl">家庭地址</label><input class="fld" id="m_addr" value="${s?esc(s.address):""}" placeholder="选填"></div>
+    <div class="field"><label class="lbl">爱好</label><input class="fld" id="m_hobby" value="${s?esc(s.hobby):""}" placeholder="多个爱好用逗号分隔"></div>
     <div class="field"><label class="lbl">备注</label><textarea class="fld" id="m_note">${s?esc(s.note):""}</textarea></div>
     <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveStudent('${id||""}')">保存</button></div>`);
 };
 W.saveStudent=id=>{
   const name=$("#m_name").value.trim();if(!name){toast("请填姓名");return;}
-  const data={name,no:$("#m_no").value.trim(),sex:$("#m_sex").value,g:$("#m_g").value.trim(),tier:$("#m_tier")?$("#m_tier").value:"",phone:phoneList($("#m_phone").value).join(" / "),height:+$("#m_h").value||0,note:$("#m_note").value.trim()};
+  const data={name,no:$("#m_no").value.trim(),sex:$("#m_sex").value,g:$("#m_g").value.trim(),tier:$("#m_tier")?$("#m_tier").value:"",phone:phoneList($("#m_phone").value).join(" / "),height:+$("#m_h").value||0,idCard:$("#m_id").value.trim(),address:$("#m_addr").value.trim(),hobby:$("#m_hobby").value.trim(),note:$("#m_note").value.trim()};
   if(id){Object.assign(el(id,S.students),data);}else{S.students.push({id:uid(),...data});}
   save();closeModal();
   /* 就地重渲名册，保持滚动位置（不整页 route，避免跳回顶部） */
@@ -2939,38 +2962,77 @@ W.delStudent=id=>{
   const y=window.scrollY;viewRoster(document.getElementById("view"));window.scrollTo(0,y);
 };
 W.importRoster=()=>{
-  /* 点击即弹出系统文件选择窗口，不再经弹窗中转 */
+  /* 先弹去重开关，再选文件 */
+  openModal(`<h3>导入名册</h3>
+    <div class="tiny muted" style="margin-bottom:10px">CSV 表头支持：学号,姓名,家长电话,学习组,性别,身高,身份证,家庭地址,爱好,等级,备注。重复导入会按开关决定是否合并。</div>
+    <label class="row" style="gap:8px;margin:6px 0 12px;cursor:pointer"><input type="checkbox" id="m_dedup" checked style="width:16px;height:16px"><span>重复时按「姓名→学号→身份证」匹配并更新（不新增副本）；CSV 中空字段保留原值</span></label>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W._pickRosterFile()">选择文件</button></div>`);
+};
+W._pickRosterFile=()=>{
+  const dedup=!!(document.getElementById("m_dedup")&&document.getElementById("m_dedup").checked);
+  closeModal();
   pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
     if(err){toast(err);return;}
-    const r=applyRosterText(text);
+    const r=applyRosterText(text,dedup);
     if(r.empty){toast("文件为空");return;}
-    save();refresh();toast("已导入 "+r.n+" 人");
+    save();refresh();
+    toast(r.updated?("新增 "+r.n+" 人，更新 "+r.updated+" 人"):("已导入 "+r.n+" 人"));
   }));
 };
-/* 解析名册 CSV 文本并追加到名单；返回 {n,empty}（纯函数） */
-function applyRosterText(txt){
+/* 解析名册 CSV 文本并写入名单；dedup=true 时按 姓名→学号→身份证 匹配已存在学生并更新（空字段保留原值），否则纯追加。返回 {n,updated,empty} */
+function applyRosterText(txt,dedup){
   const lines=String(txt||"").replace(/^\ufeff/,"").split(/\r?\n/).filter(l=>l.trim());
-  if(!lines.length)return {n:0,empty:true};
+  if(!lines.length)return {n:0,updated:0,empty:true};
   const cells=l=>l.split(/[,，]/).map(x=>x.trim());
   const HMAP={"学号":"no","姓名":"name","名字":"name","等级":"tier","家长电话":"phone","电话":"phone",
-    "备注":"note","学习组":"g","组":"g","性别":"sex","身高":"height"};
+    "备注":"note","学习组":"g","组":"g","性别":"sex","身高":"height",
+    "身份证":"idCard","身份證":"idCard","家庭地址":"address","家庭住址":"address","住址":"address","地址":"address",
+    "爱好":"hobby","興趣":"hobby","兴趣":"hobby"};
   const head=cells(lines[0]);
   let map=null,start=0;
   if(head.filter(h=>HMAP[h]).length>=2){map={};head.forEach((h,i)=>{if(HMAP[h]&&map[HMAP[h]]===undefined)map[HMAP[h]]=i;});start=1;}
   /* 无表头时的位置顺序（与导出顺序去掉等级/备注后一致） */
-  const POS=["no","name","phone","g","sex","height"];
+  const POS=["no","name","phone","g","sex","height","idCard","address","hobby"];
   const get=(c,k,d)=>{
     let v;
     if(map)v=map[k]!==undefined?c[map[k]]:"";
     else{const i=POS.indexOf(k);v=i>=0?(c[i]||""):"";}
     return v===""?d:v;
   };
-  let n=0;for(let i=start;i<lines.length;i++){
+  /* 去重匹配优先级：学号 > 身份证 > 姓名（取首个命中） */
+  const findStudent=(no,idCard,name)=>{
+    if(no){const s=S.students.find(s=>s.no&&s.no===no);if(s)return s;}
+    if(idCard){const s=S.students.find(s=>s.idCard&&s.idCard===idCard);if(s)return s;}
+    return S.students.find(s=>s.name===name);
+  };
+  let n=0,updated=0;
+  for(let i=start;i<lines.length;i++){
     const c=cells(lines[i]);
     const name=get(c,"name","");if(!name)continue;
-    S.students.push({id:uid(),name,no:get(c,"no",""),sex:get(c,"sex","男")||"男",
-      g:get(c,"g",""),tier:"",phone:get(c,"phone",""),height:+get(c,"height",0)||0,note:get(c,"note","")});n++;}
-  return {n};
+    const no=get(c,"no",""),idCard=get(c,"idCard",""),sexRaw=get(c,"sex",""),g=get(c,"g",""),
+      tier=get(c,"tier",""),phone=get(c,"phone",""),heightRaw=get(c,"height",""),
+      address=get(c,"address",""),hobby=get(c,"hobby",""),note=get(c,"note","");
+    const sex=sexRaw||"男";
+    const data={name,no,sex,g,tier,phone,height:+heightRaw||0,idCard,address,hobby,note};
+    if(dedup){
+      const ex=findStudent(no,idCard,name);
+      if(ex){
+        if(no)ex.no=no;
+        if(sexRaw)ex.sex=sex;
+        if(g)ex.g=g;
+        if(tier)ex.tier=tier;
+        if(phone)ex.phone=phone;
+        if(heightRaw)ex.height=+heightRaw||0;
+        if(idCard)ex.idCard=idCard;
+        if(address)ex.address=address;
+        if(hobby)ex.hobby=hobby;
+        if(note)ex.note=note;
+        updated++;continue;
+      }
+    }
+    S.students.push({id:uid(),...data});n++;
+  }
+  return {n,updated};
 }
 W.gotoRoster=id=>{location.hash="roster";};
 W.newExam=()=>{
@@ -5057,14 +5119,21 @@ function csvCell(v){
   return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
 }
 function rosterText(){
-  /* 顺序与名册表格一致：学号,姓名,等级,家长电话,备注,学习组,性别,身高（不含操作列） */
-  let t=ROSTER_LABELS.slice(0,8).join(",")+"\n";
-  S.students.forEach(s=>{t+=[csvCell(s.no||""),csvCell(s.name),csvCell(tierOf(s)||""),csvCell(s.phone||""),csvCell(s.note||""),csvCell(s.g||""),csvCell(s.sex||""),csvCell(s.height||"")].join(",")+"\n";});
+  /* 与名册表格一致，排除操作列 */
+  const cols=ROSTER_COLS.filter(c=>c.c!=="c-act");
+  const V={
+    "c-no":s=>s.no||"", "c-name":s=>s.name, "c-tier":s=>tierOf(s)||"",
+    "c-phone":s=>s.phone||"", "c-g":s=>s.g||"", "c-idcard":s=>s.idCard||"",
+    "c-addr":s=>s.address||"", "c-hobby":s=>s.hobby||"", "c-note":s=>s.note||"",
+    "c-sex":s=>s.sex||"", "c-h":s=>s.height||""
+  };
+  let t=cols.map(c=>csvCell(c.t)).join(",")+"\n";
+  S.students.forEach(s=>{t+=cols.map(c=>csvCell(V[c.c](s))).join(",")+"\n";});
   return t;
 }
 W.exportRoster=()=>{
   openModal(`<h3>导出学生名册</h3>
-  <div class="tiny muted" style="margin-bottom:6px">格式：${ROSTER_LABELS.slice(0,8).join(",")}（等级为当前有效等级：手动设定优先于计算）</div>
+  <div class="tiny muted" style="margin-bottom:6px">格式：${ROSTER_COLS.filter(c=>c.c!=="c-act").map(c=>c.t).join(",")}（等级为当前有效等级：手动设定优先于计算）</div>
   <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(rosterText())}</textarea>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn ghost" onclick="W.downloadIO('学生名册')">下载 CSV</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
 };
