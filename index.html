@@ -521,6 +521,14 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .cls-tel{display:inline-block;margin-left:4px;font-size:13px;line-height:1.6;color:var(--brand);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:0 6px;white-space:nowrap}
 .cls-tel:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
 .cls-tel:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+/* 常驻云端同步状态点 */
+.sync-dot{position:fixed;top:9px;right:12px;z-index:60;display:flex;align-items:center;gap:6px;font-size:11px;line-height:1;padding:5px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted);box-shadow:var(--shadow-1);user-select:none;cursor:default;max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-dot .dot{width:8px;height:8px;border-radius:50%;background:#bbb;flex:none;box-shadow:0 0 0 3px rgba(0,0,0,.04)}
+.sync-dot.ok .dot{background:#2e7d32}
+.sync-dot.err .dot{background:#c0392b}
+.sync-dot.warn .dot{background:#e69500}
+.sync-dot .tx{overflow:hidden;text-overflow:ellipsis}
+@media(max-width:767px){.sync-dot{top:7px;right:9px;font-size:10px;padding:4px 9px}}
 </style>
 </head>
 <body data-page-node-id="WKyavnS7yVYO8qWNuXAl2D">
@@ -546,6 +554,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 </div>
 
 <nav class="bottom" id="bottom" data-page-node-id="4EgKYnUQuLBmqYmHsn3QDz"></nav>
+<div class="sync-dot" id="syncDot" title=""><span class="dot"></span><span class="tx">未同步</span></div>
 <div class="more-drawer" id="moreDrawer" data-page-node-id="MieCFMRXTaAIR766oB0sKD"><div class="more-sheet" id="moreSheet" data-page-node-id="EgFxH0414EYkU74HXHlTqY"></div></div>
 
 <div class="mask" id="mask" data-page-node-id="TGMn5LRJqJONUFjVzamwdV"><div class="modal" id="modal" data-page-node-id="5fL7p6xA5gFJGxHFmwlkEW"></div></div>
@@ -5200,7 +5209,28 @@ function ghFetch(url,opts,ms){
   return fetch(url,o).finally(()=>{if(t)clearTimeout(t);});
 }
 function cloudErr(e){return ((e&&e.name==="AbortError")||/abort/i.test((e&&e.message)||""))?"请求超时（网络慢或无连接），请重试":((e&&e.message)||"网络错误");}
-function cloudStatus(st,msg){const el=document.getElementById("cloud_st");if(!el)return;el.textContent=msg||"";el.style.color=st==="ok"?"#2e7d32":st==="err"?"#c0392b":"var(--ink-2)";}
+let lastCloudSt="",lastCloudMsg="";
+function cloudStatus(st,msg){lastCloudSt=st||"";lastCloudMsg=msg||"";const el=document.getElementById("cloud_st");if(el){el.textContent=msg||"";el.style.color=st==="ok"?"#2e7d32":st==="err"?"#c0392b":"var(--ink-2)";}syncDotUpdate();}
+function syncDotUpdate(){
+  const el=document.getElementById("syncDot");if(!el)return;
+  const c=cloudCfg();el.classList.remove("ok","err","warn");
+  const tx=el.querySelector(".tx");
+  if(!cloudReadyEnough(c)){tx.textContent="未同步";el.title="未开启云端同步";return;}
+  if(S._demo&&cloudReady){el.classList.add("warn");tx.textContent="示例数据";el.title="当前为示例数据，不会上传（请先建立真实班级/导入名册）";return;}
+  if(lastCloudSt==="err"){el.classList.add("err");tx.textContent="同步失败";el.title=lastCloudMsg||"同步失败";return;}
+  if(!cloudReady){el.classList.add("warn");tx.textContent="连接中";el.title="正在连接云端…";return;}
+  if(c.lastSync){el.classList.add("ok");tx.textContent="已同步 "+new Date(c.lastSync).toLocaleTimeString();el.title="云端同步正常";return;}
+  el.classList.add("ok");tx.textContent="已连接";el.title="云端已连接，改动自动同步";
+}
+function refreshCloudStatusUI(){
+  const c=cloudCfg();
+  if(!cloudReadyEnough(c))cloudStatus("","已达成本地保存；开启「云端同步」可多设备共用");
+  else if(S._demo)cloudStatus("","当前为示例数据，不会上传（请先建立真实班级）");
+  else if(lastCloudSt==="err")cloudStatus("err",lastCloudMsg||"同步失败");
+  else if(!cloudReady)cloudStatus("",cloudCfg().enabled?"连接云端中…":"未连接");
+  else if(c.lastSync)cloudStatus("ok","已同步 "+new Date(c.lastSync).toLocaleTimeString());
+  else cloudStatus("ok","云端已连接，改动自动同步");
+}
 
 async function cloudPullRemote(c){
   const r=await ghFetch(ghUrl(c),{method:"GET",headers:ghHeaders(c)},12000);
@@ -5503,6 +5533,7 @@ function init(){
   route();
   bootCloudSync();/* 已启用云端同步时，启动即拉取云端最新数据 */
   setInterval(cloudPoll,30000);/* 页面开着时每 30 秒静默拉取云端，发现其他设备更新即采用 */
+  refreshCloudStatusUI();/* 初始渲染常驻同步状态点（真实状态，非占位） */
 }
 init();
 </script>
