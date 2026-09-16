@@ -509,6 +509,10 @@ table.tbl.roster th.sortable{padding:9px 4px}
   table.tbl.roster .cv-m .tx{display:none;font-variant-numeric:tabular-nums;white-space:normal;word-break:break-all}
   table.tbl.roster .cv-m.revealed .ic{display:none}
   table.tbl.roster .cv-m.revealed .tx{display:inline}
+  /* 手机端：敏感列仅占用图标宽度，避免横向滚动拥挤 */
+  table.tbl.roster .c-phone,
+  table.tbl.roster .c-idcard,
+  table.tbl.roster .c-addr{width:28px;min-width:28px;max-width:28px;white-space:nowrap;overflow:hidden}
   .sched-scroll{-webkit-overflow-scrolling:touch}
   /* 手机端：周一~周五列等宽且给定最小宽度，内容多时仍可在 .sched-scroll 内横滑 */
   .sched{grid-template-columns:max-content repeat(5,minmax(88px,1fr))}
