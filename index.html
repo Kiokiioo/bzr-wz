@@ -379,6 +379,17 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .rd-cat-h:first-child{margin-top:0}
 .rd-cat-tag{font-size:11px;font-weight:600;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;background:var(--panel-2)}
 .rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+/* 兑换记录：按月折叠分组 */
+.rd-month{border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--panel);overflow:hidden}
+.rd-month summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:9px 12px;font-size:13px;font-weight:700;user-select:none}
+.rd-month summary::-webkit-details-marker{display:none}
+.rd-month summary::before{content:"▸";color:var(--muted);margin-right:7px;font-size:11px}
+.rd-month[open] summary::before{content:"▾"}
+.rd-month summary:focus{outline:none}
+.rd-month-name{flex:1}
+.rd-month-tag{font-size:11px;font-weight:600;color:var(--muted);background:var(--panel-2);border-radius:999px;padding:1px 8px}
+.rd-month-body{padding:0 8px 8px}
+.rd-month-body .r-item{padding-left:6px;padding-right:6px}
 .rd-item{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:7px}
 .rd-item .rd-name{font-weight:700;font-size:13.5px;line-height:1.3}
 .rd-item .rd-cost{color:var(--brand-ink);font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
@@ -502,17 +513,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .seat-col-sep{width:6px}
   .st-tag{min-height:52px;font-size:10px}
   .tbl-scroll{max-height:none;-webkit-overflow-scrolling:touch}
-  /* 手机端：敏感列改为图标，点击展开明文（桌面端仍为明文） */
+  /* 手机端：敏感列改为图标，点击弹窗/拨号（桌面端仍为明文） */
   table.tbl.roster .cv-d{display:none}
-  table.tbl.roster .cv-m{display:inline-flex;align-items:center;gap:4px}
-  table.tbl.roster .cv-m .ic{font-size:15px;cursor:pointer;user-select:none}
-  table.tbl.roster .cv-m .tx{display:none;font-variant-numeric:tabular-nums;white-space:normal;word-break:break-all}
-  table.tbl.roster .cv-m.revealed .ic{display:none}
-  table.tbl.roster .cv-m.revealed .tx{display:inline}
+  table.tbl.roster .cv-m{display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:16px;cursor:pointer;user-select:none}
   /* 手机端：敏感列仅占用图标宽度，避免横向滚动拥挤 */
-  table.tbl.roster .c-phone,
+  table.tbl.roster .c-phone{width:40px;min-width:40px;max-width:40px;white-space:nowrap;overflow:hidden}
   table.tbl.roster .c-idcard,
-  table.tbl.roster .c-addr{width:28px;min-width:28px;max-width:28px;white-space:nowrap;overflow:hidden}
+  table.tbl.roster .c-addr{width:30px;min-width:30px;max-width:30px;white-space:nowrap;overflow:hidden}
   .sched-scroll{-webkit-overflow-scrolling:touch}
   /* 手机端：周一~周五列等宽且给定最小宽度，内容多时仍可在 .sched-scroll 内横滑 */
   .sched{grid-template-columns:max-content repeat(5,minmax(88px,1fr))}
@@ -1398,10 +1405,10 @@ function rosterRows(cols){
     "c-no":s=>`<td class="c-no">${esc(s.no)}</td>`,
     "c-name":s=>`<td class="c-name"><b style="cursor:pointer" title="查看最近表现" onclick="W.stuRecent('${s.id}')">${esc(s.name)}</b></td>`,
     "c-tier":s=>`<td class="c-tier">${tierOf(s)?`<span class="twrap"><span class="chip ${TC[tierOf(s)]||"tier-a"}" style="cursor:pointer" title="查看最近一次考试成绩" onclick="W.stuLastExam('${s.id}')">${esc(tierOf(s))}</span>${s.tier?`<span class="tiny muted" title="手动设定">*</span>`:""}</span>`:"—"}</td>`,
-    "c-phone":s=>`<td class="c-phone"><span class="cv-d">${phoneLink(s.phone)}</span><span class="cv-m reveal" onclick="W.toggleReveal(this)" title="点击显示号码"><span class="ic">📞</span><span class="tx">${esc(s.phone)}</span></span></td>`,
+    "c-phone":s=>`<td class="c-phone"><span class="cv-d">${phoneLink(s.phone)}</span><span class="cv-m" title="点击拨打" onclick="W.dialPhone('${s.id}')">📞</span></td>`,
     "c-g":s=>`<td class="c-g">${esc(s.g)}</td>`,
-    "c-idcard":s=>`<td class="c-idcard"><span class="cv-d">${esc(s.idCard)||"—"}</span><span class="cv-m reveal" onclick="W.toggleReveal(this)" title="点击显示身份证"><span class="ic">🪪</span><span class="tx">${esc(s.idCard)||"—"}</span></span></td>`,
-    "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}"><span class="cv-d">${esc(s.address)||"—"}</span><span class="cv-m reveal" onclick="W.toggleReveal(this)" title="点击显示地址"><span class="ic">🏠</span><span class="tx">${esc(s.address)||"—"}</span></span></td>`,
+    "c-idcard":s=>`<td class="c-idcard"><span class="cv-d">${esc(s.idCard)||"—"}</span><span class="cv-m" title="点击查看身份证" onclick="W.rosterPopup('${s.id}','idCard','🪪 身份证')">🪪</span></td>`,
+    "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}"><span class="cv-d">${esc(s.address)||"—"}</span><span class="cv-m" title="点击查看家庭住址" onclick="W.rosterPopup('${s.id}','address','🏠 家庭住址')">🏠</span></td>`,
     "c-hobby":s=>`<td class="c-hobby">${esc(s.hobby)||"—"}</td>`,
     "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
     "c-sex":s=>`<td class="c-sex">${esc(s.sex)}</td>`,
@@ -1411,8 +1418,22 @@ function rosterRows(cols){
   };
   return list.map(s=>`<tr>${CS.map(c=>TD[c.c](s)).join("")}</tr>`).join("");
 }
-/* 手机端名册敏感列：点击图标切换显示明文（桌面端 .cv-m 隐藏，此函数不生效） */
-W.toggleReveal=el=>{if(el&&el.classList)el.classList.toggle("revealed");};
+/* 手机端名册：点击身份证/家庭住址图标 → 弹窗显示完整内容 */
+W.rosterPopup=(sid,field,title)=>{
+  const st=el(sid,S.students);if(!st)return;
+  const val=(st[field]||"").trim()||"（空）";
+  openModal(`<h3>${esc(title)}</h3>
+  <div style="padding:8px 0;font-size:15px;line-height:1.6;word-break:break-all;white-space:pre-wrap">${esc(val)}</div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
+/* 手机端名册：点击电话图标 → 直接拨打（单号直拨，多号弹窗选拨） */
+W.dialPhone=(sid)=>{
+  const st=el(sid,S.students);if(!st)return;
+  const arr=phoneList(st.phone);
+  if(!arr.length){openModal(`<h3>📞 拨打</h3><div class="empty">暂无电话号码</div><div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);return;}
+  if(arr.length===1){location.href="tel:"+arr[0];return;}
+  openModal(`<h3>📞 拨打</h3>${arr.map(t=>`<div class="r-item" style="padding:8px 0"><div style="flex:1;min-width:0">${esc(t)}</div><a class="btn sm h30" href="tel:${esc(t)}" style="flex:none;text-decoration:none">拨打</a></div>`).join("")}<div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
 /* 点姓名：最近表现（该生行为记录，倒序取 15 条） */
 W.stuRecent=sid=>{
   const st=el(sid,S.students);if(!st)return;
@@ -1880,15 +1901,16 @@ function taskFormMode(){
 }
 
 /* ============ BEHAVIOR ============ */
-let behKw="",behFilter="";
+let behKw="",behFilter="",behStu="";
 function viewBehavior(v){
   ensureTerms();
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
   const bv=S.behView||(S.behView={mode:"week",custom:{s:"",e:""}});
   const _b=ptRangeBounds(bv);
   let list=S.behaviors.slice().sort((a,b)=>(b.time||"").localeCompare(a.time||""));
-  /* 时间范围：选项与积分页完全一致（最近一周 / 最近一月 / 已设学期 / 所有时间 / 自定义） */
-  if(_b)list=list.filter(b=>{const ds=(b.time||"").slice(0,10);return ds&&ds>=_b.s&&ds<=_b.e;});
+  /* 时间范围：选项与积分页完全一致（最近一周 / 最近一月 / 已设学期 / 所有时间 / 自定义）；按学生筛选时忽略时间范围，显示该生全部记录 */
+  if(behStu)list=list.filter(b=>b.studentId===behStu);
+  else if(_b)list=list.filter(b=>{const ds=(b.time||"").slice(0,10);return ds&&ds>=_b.s&&ds<=_b.e;});
   if(behFilter)list=list.filter(b=>b.type===behFilter);
   if(behKw){const k=behKw.toLowerCase();list=list.filter(b=>(studentName(b.studentId)+b.reason+b.type).toLowerCase().includes(k));}
   const bopt=(val,label)=>`<option value="${esc(val)}" ${bv.mode===val?"selected":""}>${esc(label)}</option>`;
@@ -1914,7 +1936,8 @@ function viewBehavior(v){
       <button class="btn ghost sm h30" style="width:44px;flex:none" onclick="location.hash='#behtypes'">类别</button>
       <button class="btn sm h30" style="width:44px;flex:none" onclick="W.addBehavior()">记录</button>
     </div>
-    <div class="tiny muted" style="margin:-6px 0 10px">时间范围：${esc(ptRangeLabel(bv))} · ${list.length} 条</div>
+    ${behStu?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eef3ff;color:var(--brand);border:1px solid var(--brand);border-radius:8px;padding:6px 10px;margin:-6px 0 10px;font-size:13px"><span>正在查看 <b>${esc(studentName(behStu))}</b> 的全部行为记录（${list.length} 条）</span><button class="btn sm h30" style="flex:none" onclick="behStu='';viewBehavior(document.getElementById('view'))">✕ 显示全部</button></div>`
+      :`<div class="tiny muted" style="margin:-6px 0 10px">时间范围：${esc(ptRangeLabel(bv))} · ${list.length} 条</div>`}
     <div class="row wrap" style="margin-bottom:12px">${filters}</div>
     ${list.length?list.map(b=>{
       const tp=btype(b.type);
@@ -1924,7 +1947,7 @@ function viewBehavior(v){
       return `<div class="r-item"><span class="r-dot" style="background:${col};color:${col}"></span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <b>${esc(studentName(b.studentId))}</b>
+          <b style="cursor:pointer;color:var(--brand)" title="查看该生全部行为记录" onclick="behStu='${b.studentId}';viewBehavior(document.getElementById('view'))">${esc(studentName(b.studentId))}</b>
           <span class="chip" style="background:${soft};color:${col};border-color:transparent;padding:1px 8px;font-size:11.5px">${esc(b.type)}</span>
           ${dBadge}
           <span class="muted" style="font-size:13px">${esc(b.reason||"")}</span>
@@ -2521,8 +2544,8 @@ function redeemSectionHtml(){
           <button class="btn ghost sm h24" ${out?"disabled":""} onclick="W.redeemItem('${it.id}')" title="用积分兑换">兑换</button>
         </div></div>`;}).join("")}</div>`:`<div class="tiny muted">该分类下暂无项目</div>`}
   `).join("")||(R.items.length?"":`<div class="empty">还没有兑换项目，点「管理」添加分类与奖励</div>`);
-  const all=(R.logs||[]).slice().sort((a,b)=>(b.time||"").localeCompare(a.time||"")).slice(0,15);
-  const logHtml=all.length?all.map(l=>{
+  const all=(R.logs||[]).slice().sort((a,b)=>(b.time||"").localeCompare(a.time||""));
+  const perItem=l=>{
     const acts=l.cancelled?`<span class="r-act"><button class="del" onclick="W.rdmDelLog('${l.id}')">删除</button></span>`:`<span class="r-act"><button onclick="W.rdmUndo('${l.id}')">撤销</button><button class="del" onclick="W.rdmDelLog('${l.id}')">删除</button></span>`;
     if(l.type==='eliminate'){
       const n=(+l.eliminated||(+l.cost||0)*(+l.qty||1)), m=n;
@@ -2533,7 +2556,15 @@ function redeemSectionHtml(){
     const c=(+l.cost||0)*(+l.qty||1);
     return `<div class="r-item${l.cancelled?' cancelled':''}"><span class="r-dot" style="background:var(--warn);color:var(--warn)"></span>
       <div style="flex:1"><div>${esc(studentName(l.studentId))} 兑换 <b>${esc(l.itemName)}</b>${l.qty>1?` ×${l.qty}`:""} <b>−${c}</b> 分${l.catName?` <span class="tiny muted">· ${esc(l.catName)}</span>`:""}${l.cancelled?`<span class="tiny muted"> · 已撤销</span>`:""}</div><div class="tiny muted">${esc(l.time)}</div></div>${acts}</div>`;
-  }).join(""):`<div class="empty">还没有兑换记录</div>`;
+  };
+  const monthKey=t=>{const s=String(t||"").slice(0,7);return /^\d{4}-\d{2}$/.test(s)?s:"未知月份";};
+  const mmap={};all.forEach(l=>{const k=monthKey(l.time);(mmap[k]=mmap[k]||[]).push(l);});
+  const months=Object.keys(mmap).sort((a,b)=>b.localeCompare(a));
+  const latest=months[0];
+  const logHtml=months.length?months.map(k=>`<details class="rd-month" ${k===latest?'open':''}>
+      <summary class="rd-month-h"><span class="rd-month-name">${esc(k)}</span><span class="rd-month-tag">${mmap[k].length} 条</span></summary>
+      <div class="rd-month-body">${mmap[k].map(perItem).join("")}</div>
+    </details>`).join(""):`<div class="empty">还没有兑换记录</div>`;
   return `
   <div class="card pad">
     <div class="between row" style="margin-bottom:10px">
@@ -2543,7 +2574,7 @@ function redeemSectionHtml(){
     ${body}
   </div>
   <div class="card pad" style="margin-top:14px">
-    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">兑换记录</span>${all.length?`<span class="tiny muted">最近 ${all.length} 条</span>`:""}</div>
+    <div class="between row wrap" style="margin-bottom:10px"><span class="section-title" style="margin:0">兑换记录</span>${all.length?`<span class="tiny muted">共 ${all.length} 条 · 按月分组</span>`:""}</div>
     ${logHtml}
   </div>`;
 }
