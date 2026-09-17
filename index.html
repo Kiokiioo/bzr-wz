@@ -517,9 +517,9 @@ table.tbl.roster th.sortable{padding:9px 4px}
   table.tbl.roster .cv-d{display:none}
   table.tbl.roster .cv-m{display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:16px;cursor:pointer;user-select:none}
   /* 手机端：敏感列仅占用图标宽度，避免横向滚动拥挤 */
-  table.tbl.roster .c-phone{width:40px;min-width:40px;max-width:40px;white-space:nowrap;overflow:hidden}
+  table.tbl.roster .c-phone{width:50px;min-width:50px;max-width:50px;white-space:nowrap;overflow:hidden}
   table.tbl.roster .c-idcard,
-  table.tbl.roster .c-addr{width:30px;min-width:30px;max-width:30px;white-space:nowrap;overflow:hidden}
+  table.tbl.roster .c-addr{width:40px;min-width:40px;max-width:40px;white-space:nowrap;overflow:hidden}
   .sched-scroll{-webkit-overflow-scrolling:touch}
   /* 手机端：周一~周五列等宽且给定最小宽度，内容多时仍可在 .sched-scroll 内横滑 */
   .sched{grid-template-columns:max-content repeat(5,minmax(88px,1fr))}
@@ -1256,19 +1256,19 @@ function taskLine(t){
 /* ============ ROSTER ============ */
 let rosterKw="";
 let rosterSort={k:"",dir:1}; /* k: name/sex/g/tier/phone/height；dir: 1 升 / -1 降；k 为空=录入顺序 */
-/* 列顺序：学号 → 姓名 → 等级 → 家长电话 → 学习组 → 身份证 → 家庭地址 → 爱好 → 备注 → 性别 → 身高 → 操作
+/* 列顺序：学号 → 姓名 → 等级 → 学习组 → 家长电话 → 身份证 → 住址 → 备注 → 性别 → 爱好 → 身高 → 操作
    k 为空 = 不可排序；导出 CSV 沿用同一顺序 */
 const ROSTER_COLS=[
   {k:"",      t:"学号",     c:"c-no"},
   {k:"name",  t:"姓名",     c:"c-name"},
   {k:"tier",  t:"等级",     c:"c-tier"},
-  {k:"",      t:"家长电话", c:"c-phone"},
   {k:"g",     t:"学习组",   c:"c-g"},
+  {k:"",      t:"家长电话", c:"c-phone"},
   {k:"",      t:"身份证",   c:"c-idcard"},
-  {k:"",      t:"家庭地址", c:"c-addr"},
-  {k:"",      t:"爱好",     c:"c-hobby"},
+  {k:"",      t:"住址",     c:"c-addr"},
   {k:"",      t:"备注",     c:"c-note"},
   {k:"sex",   t:"性别",     c:"c-sex"},
+  {k:"",      t:"爱好",     c:"c-hobby"},
   {k:"height",t:"身高",     c:"c-h"},
   {k:"",      t:"操作",     c:"c-act"}
 ];
@@ -1408,7 +1408,7 @@ function rosterRows(cols){
     "c-phone":s=>`<td class="c-phone"><span class="cv-d">${phoneLink(s.phone)}</span><span class="cv-m" title="点击拨打" onclick="W.dialPhone('${s.id}')">📞</span></td>`,
     "c-g":s=>`<td class="c-g">${esc(s.g)}</td>`,
     "c-idcard":s=>`<td class="c-idcard"><span class="cv-d">${esc(s.idCard)||"—"}</span><span class="cv-m" title="点击查看身份证" onclick="W.rosterPopup('${s.id}','idCard','🪪 身份证')">🪪</span></td>`,
-    "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}"><span class="cv-d">${esc(s.address)||"—"}</span><span class="cv-m" title="点击查看家庭住址" onclick="W.rosterPopup('${s.id}','address','🏠 家庭住址')">🏠</span></td>`,
+    "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}"><span class="cv-d">${esc(s.address)||"—"}</span><span class="cv-m" title="点击查看住址" onclick="W.rosterPopup('${s.id}','address','🏠 住址')">🏠</span></td>`,
     "c-hobby":s=>`<td class="c-hobby">${esc(s.hobby)||"—"}</td>`,
     "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
     "c-sex":s=>`<td class="c-sex">${esc(s.sex)}</td>`,
@@ -2991,7 +2991,7 @@ W.editStudent=id=>{
       <div style="flex:1"><label class="lbl">身份证</label><input class="fld" id="m_id" value="${s?esc(s.idCard):""}" placeholder="选填"></div></div>
     <div class="field"><label class="lbl">家长电话</label><input class="fld" id="m_phone" value="${s?esc(s.phone):""}" placeholder="多个电话用逗号或空格分隔"></div>
     <div class="tiny muted" style="margin:-4px 0 10px">可填多个，如「13800000000,13900000000」；名册里分行显示，点任一个直接拨号。</div>
-    <div class="field"><label class="lbl">家庭地址</label><input class="fld" id="m_addr" value="${s?esc(s.address):""}" placeholder="选填"></div>
+    <div class="field"><label class="lbl">住址</label><input class="fld" id="m_addr" value="${s?esc(s.address):""}" placeholder="选填"></div>
     <div class="field"><label class="lbl">爱好</label><input class="fld" id="m_hobby" value="${s?esc(s.hobby):""}" placeholder="多个爱好用逗号分隔"></div>
     <div class="field"><label class="lbl">备注</label><textarea class="fld" id="m_note">${s?esc(s.note):""}</textarea></div>
     <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveStudent('${id||""}')">保存</button></div>`);
@@ -3019,7 +3019,7 @@ W.delStudent=id=>{
 W.importRoster=()=>{
   /* 先弹去重开关，再选文件 */
   openModal(`<h3>导入名册</h3>
-    <div class="tiny muted" style="margin-bottom:10px">CSV 表头支持：学号,姓名,家长电话,学习组,性别,身高,身份证,家庭地址,爱好,等级,备注。重复导入会按开关决定是否合并。</div>
+    <div class="tiny muted" style="margin-bottom:10px">CSV 表头支持：学号,姓名,家长电话,学习组,性别,身高,身份证,住址,爱好,等级,备注。重复导入会按开关决定是否合并。</div>
     <label class="row" style="gap:8px;margin:6px 0 12px;cursor:pointer"><input type="checkbox" id="m_dedup" checked style="width:16px;height:16px"><span>重复时按「姓名→学号→身份证」匹配并更新（不新增副本）；CSV 中空字段保留原值</span></label>
     <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W._pickRosterFile()">选择文件</button></div>`);
 };
