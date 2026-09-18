@@ -264,6 +264,7 @@ table.tbl.grades .g-name{width:60px;min-width:60px;max-width:60px}
 table.tbl.grades .g-sub{width:45px}
 table.tbl.grades .g-mini{width:45px}
 table.tbl.grades .g-rank{width:40px}
+table.tbl.grades .g-srank{width:44px}
 table.tbl.grades .g-total{width:50px}
 table.tbl.roster th.sortable{padding:9px 4px}
 
@@ -517,15 +518,20 @@ table.tbl.roster th.sortable{padding:9px 4px}
   table.tbl.roster .cv-d{display:none}
   table.tbl.roster .cv-m{display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:16px;cursor:pointer;user-select:none}
   /* 手机端：敏感列仅占用图标宽度，避免横向滚动拥挤 */
-  table.tbl.roster .c-phone{width:50px;min-width:50px;max-width:50px;white-space:nowrap;overflow:hidden}
+  table.tbl.roster .c-phone{width:55px;min-width:55px;max-width:55px;white-space:nowrap;overflow:hidden}
   table.tbl.roster .c-idcard,
-  table.tbl.roster .c-addr{width:40px;min-width:40px;max-width:40px;white-space:nowrap;overflow:hidden}
+  table.tbl.roster .c-addr,
+  table.tbl.roster .c-note{width:40px;min-width:40px;max-width:40px;white-space:nowrap;overflow:hidden}
   .sched-scroll{-webkit-overflow-scrolling:touch}
   /* 手机端：周一~周五列等宽且给定最小宽度，内容多时仍可在 .sched-scroll 内横滑 */
   .sched{grid-template-columns:max-content repeat(5,minmax(88px,1fr))}
   /* 手机端隐藏所有滚动条（内容仍可滚动） */
   *{scrollbar-width:none}
   *::-webkit-scrollbar{display:none}
+  /* 手机端：请假时间范围两个 datetime-local 上下排，避免结束时间被截断 */
+  .beh-time-row{flex-direction:column;align-items:stretch;gap:8px}
+  .beh-time-row .muted{align-self:flex-start}
+  .beh-time-row input{width:100%;box-sizing:border-box}
 }
 /* 首页·今日课程卡片 */
 .cls-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
@@ -1410,7 +1416,7 @@ function rosterRows(cols){
     "c-idcard":s=>`<td class="c-idcard"><span class="cv-d">${esc(s.idCard)||"—"}</span><span class="cv-m" title="点击查看身份证" onclick="W.rosterPopup('${s.id}','idCard','🪪 身份证')">🪪</span></td>`,
     "c-addr":s=>`<td class="c-addr" title="${esc(s.address||"")}"><span class="cv-d">${esc(s.address)||"—"}</span><span class="cv-m" title="点击查看住址" onclick="W.rosterPopup('${s.id}','address','🏠 住址')">🏠</span></td>`,
     "c-hobby":s=>`<td class="c-hobby">${esc(s.hobby)||"—"}</td>`,
-    "c-note":s=>`<td class="c-note">${esc(s.note)||"—"}</td>`,
+    "c-note":s=>`<td class="c-note"><span class="cv-d">${esc(s.note)||"—"}</span><span class="cv-m" title="点击查看备注" onclick="W.rosterPopup('${s.id}','note','📝 备注')">📝</span></td>`,
     "c-sex":s=>`<td class="c-sex">${esc(s.sex)}</td>`,
     "c-h":s=>`<td class="c-h">${s.height||"—"}</td>`,
     "c-act":s=>`<td class="c-act"><span class="act"><button class="btn ghost sm h24" onclick="W.editStudent('${s.id}')">编辑</button>
@@ -1485,6 +1491,7 @@ function viewGrades(v){
   if(!gradeExam||!el(gradeExam,S.exams))gradeExam=latestExamId();/* 默认最近一次考试 */
   const ex=el(gradeExam,S.exams);
   const ranks=gradeRanks(ex);
+  const hasSR=!!(ex.schoolRank&&Object.keys(ex.schoolRank).length);
   const prev=prevExam(ex);/* 总分进退步仍对比紧邻上一场 */
   const subjRanks={};ex.subjects.forEach(sub=>subjRanks[sub]=subjRankMap(ex,sub));
   /* 各科进退步：对比上一场「有该科目」的考试 */
@@ -1531,10 +1538,11 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th></tr></thead>
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>${hasSR?'<th class="mini g-mini g-srank">校排名</th>':''}</tr></thead>
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const r=ranks[s.id];
+        const srnk=(ex.schoolRank||{})[s.id];
         const subjCells=ex.subjects.map(sub=>{
           const cur=(sc[sub]===undefined||sc[sub]===null||sc[sub]==="")?null:+sc[sub];
           const pe=subPrev[sub];const pv=pe?((pe.scores[s.id]||{})[sub]):undefined;
@@ -1547,7 +1555,7 @@ function viewGrades(v){
             +`<td class="mini g-rank">${sr?`<b class="${sr<=3?"":"muted"}" style="${sr<=3?"color:var(--warn)":""}">${sr}</b>`:`<span class="muted">—</span>`}</td>`;
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
-        return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}<td class="mini g-rank">${r?`<b class="${r<=3?"":""}" style="${r<=3?"color:var(--warn)":""}">${r}</b>`:`<span class="muted">—</span>`}</td></tr>`;
+        return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}<td class="mini g-rank">${r?`<b class="${r<=3?"":""}" style="${r<=3?"color:var(--warn)":""}">${r}</b>`:`<span class="muted">—</span>`}</td>${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
@@ -3103,7 +3111,7 @@ W.importNewExam=()=>{
   const date=$("#m_ed").value;
   pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
     if(err){toast(err);return;}
-    const ex={id:uid(),name,date,subjects:[],scores:{}};
+    const ex={id:uid(),name,date,subjects:[],scores:{},schoolRank:{}};
     S.students.forEach(s=>ex.scores[s.id]={});
     const r=applyGradeText(ex,text);
     if(!r.ok){toast(r.msg);return;}
@@ -3120,10 +3128,11 @@ W.editExam=id=>{const ex=el(id,S.exams);openModal(`<h3>编辑考试</h3>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doEditExam('${id}')">保存</button></div>`);};
 W.doEditExam=id=>{const ex=el(id,S.exams);ex.name=$("#m_en").value.trim();ex.date=$("#m_ed").value;ex.subjects=$("#m_es").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);save();closeModal();refresh();};
 W.setScore=(eid,sid,sub,val)=>{const ex=el(eid,S.exams);if(!ex.scores[sid])ex.scores[sid]={};ex.scores[sid][sub]=val===""?undefined:val;const cnt=applyGradeRules(ex);save();setTimeout(()=>{if(gradeExam===eid)viewGrades(document.getElementById("view"));},0);if(cnt)toast("已按成绩记分 "+cnt+" 条");};
-W.exportGrades=id=>{const ex=el(id,S.exams);let csv="姓名,"+ex.subjects.join(",")+",总分,平均,排名\n";
+W.exportGrades=id=>{const ex=el(id,S.exams);let csv="姓名,"+ex.subjects.join(",")+",总分,平均,排名,校排名\n";
   const ranks=gradeRanks(ex);
   S.students.forEach(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
-    csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")+`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""}\n`;});
+    const srnk=ex.schoolRank&&ex.schoolRank[s.id];
+    csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")+`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""},${srnk||""}\n`;});
   downloadCSV(ex.name,csv);};
 /* 考试记录：改备注 / 删除考试（连同成绩，撤销成绩规则自动记分） */
 W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
@@ -3191,7 +3200,7 @@ W.renderBehTime=()=>{
   const leave=inp&&isLeaveType(inp.value);
   if(leave){
     wrap.innerHTML=`<label class="lbl">时间范围</label>
-      <div class="row" style="gap:6px;align-items:center">
+      <div class="row beh-time-row" style="gap:6px;align-items:center">
         <input class="fld" id="m_btStart" type="datetime-local" value="${nowLocal()}">
         <span class="muted">至</span>
         <input class="fld" id="m_btEnd" type="datetime-local" value="${nowLocal()}">
@@ -3216,7 +3225,7 @@ W.addBehavior=(sid)=>{
       </div></div>
       <div style="flex:1"><label class="lbl">加/扣分</label><select class="fld" id="m_bp">${W.behPtsSel(firstK)}</select></div></div>
     <div class="field"><label class="lbl">事由（可选）</label><input class="fld" id="m_br" placeholder="一句话说明"></div>
-    <div class="tiny muted" style="margin-bottom:10px">点输入框右侧 ▾ 或聚焦后展开，下拉列出全部已设类别，点选即填；也可直接输入新类型，保存后自动加入「行为类别」。分值默认取类别分值，可在此框调整，保存后计入总积分。</div>
+    <div class="tiny muted" style="margin-bottom:10px">选择或输入类型，分值可调整。</div>
     <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doAddBehavior()">保存</button></div>`);
   W.behDD.open=false;/* 默认收起下拉 */
   W.renderBehTime();
@@ -5194,15 +5203,21 @@ W.exportRoster=()=>{
 };
 /* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数）。
    表头按列名定位（兼容列顺序变化与中间空列）；「总分/平均/排名」等汇总列自动跳过，
-   使本应用导出的成绩 CSV 可直接回导而不产生假科目。 */
+   使本应用导出的成绩 CSV 可直接回导而不产生假科目；「校排名」列会被识别并单独存入 ex.schoolRank。 */
 function applyGradeText(ex,text){
   if(!ex)return {ok:false,msg:"考试不存在"};
   const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(lines.length<2)return {ok:false,msg:"至少需要表头和一行数据"};
   const head=lines[0].split(/[,，]/).map(x=>x.trim());
   const SKIP={"总分":1,"平均":1,"平均分":1,"排名":1,"名次":1};
-  const cols=[];
-  head.forEach((h,i)=>{if(i>0&&h&&!SKIP[h])cols.push([h,i]);});
+  const isSR=h=>/校.{0,2}(排名|名次)|全校.?排名|学校.?排名/.test(h);
+  if(!ex.schoolRank)ex.schoolRank={};
+  const cols=[];let srCol=-1;
+  head.forEach((h,i)=>{
+    if(i===0||!h||SKIP[h])return;
+    if(isSR(h)){if(srCol<0)srCol=i;return;}
+    cols.push([h,i]);
+  });
   if(!cols.length)return {ok:false,msg:"表头缺少科目"};
   cols.forEach(([s])=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
   let n=0,miss=0;
@@ -5212,6 +5227,7 @@ function applyGradeText(ex,text){
     if(!st){miss++;continue;}
     if(!ex.scores[st.id])ex.scores[st.id]={};
     cols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
+    if(srCol>=0){const v=c[srCol];if(v!==""&&v!==undefined)ex.schoolRank[st.id]=v;}
     n++;
   }
   const cnt=applyGradeRules(ex);/* 按成绩规则自动录入加减分记录（幂等，重复导入会覆盖） */
