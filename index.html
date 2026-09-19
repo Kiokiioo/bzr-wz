@@ -416,13 +416,20 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .lottery-stage .lbl{position:absolute;top:14px;left:18px;font-size:13px;font-weight:600;color:var(--ink-2);letter-spacing:.04em}
 .drawn-list .d{display:inline-flex;align-items:center;padding:5px 11px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line);margin:4px;font-size:12.5px}
 /* 惩罚抽取：舞台比抽人矮，字号小（惩罚文字较长），允许换行 */
-.lottery-stage.pun{height:150px;font-size:30px;line-height:1.35;padding:30px 20px 0;text-align:center;word-break:break-word}
+.lottery-stage.cat{height:150px;font-size:30px;line-height:1.35;padding:30px 20px 0;text-align:center;word-break:break-word}
 .pun-log{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:6px}
 .pun-log .no{flex:none;min-width:20px;font-size:12px;font-weight:700;color:var(--ink-2);text-align:right}
 .pun-log .chk{flex:none;display:flex;align-items:center;cursor:pointer}
 .pun-log .chk input{width:16px;height:16px;margin:0;cursor:pointer;accent-color:var(--ok)}
 .pun-log.done{opacity:.6}
 .pun-log.done .txt{text-decoration:line-through}
+/* 管理类型列表：图标按钮（无边框）+ 虚线分隔 */
+.ic-row{display:flex;align-items:center;gap:16px;flex:none}
+.ic-btn{border:0;background:none;padding:2px;font-size:16px;line-height:1;color:var(--ink-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:color .12s,transform .12s}
+.ic-btn:hover{color:var(--brand-ink);transform:translateY(-1px)}
+.ic-btn:active{transform:translateY(0)}
+.dt-block{padding:10px 0}
+.dt-opt{padding:9px 0 9px 16px}
 
 /* schedule */
 .sched-scroll{overflow-x:auto}
@@ -632,13 +639,9 @@ const DEFAULT_REDEEM=()=>({
   ],
   logs:[]
 });
-/* 惩罚抽取默认惩罚项（可自定义增删改） */
-const DEFAULT_PUNS=()=>[
-  {id:"pn1",name:"罚站 5 分钟"},
-  {id:"pn2",name:"罚抄课文 1 遍"},
-  {id:"pn3",name:"做 10 个深蹲"},
-  {id:"pn4",name:"唱一首歌"},
-  {id:"pn5",name:"值日一天"}
+/* 类别抽取：默认抽取类型（每个类型有一组自定义类别）。可随时在「管理类型」里增删类型与类别 */
+const DEFAULT_DRAW_TYPES=()=>[
+  {id:"dt_pun",name:"惩罚抽取",items:[1,2,3,4,5,6].map(n=>({id:"di"+n,name:String(n)}))}
 ];
 function behColor(c){return c==='bad'?'var(--bad)':c==='ok'?'var(--ok)':c==='warn'?'var(--warn)':'var(--brand)';}
 /* 行为类别颜色：按类别名固定取色，确保默认类别互不相同；自定义类别按名称散列到调色板。
@@ -657,13 +660,15 @@ function typeColor(k){
 function typeSoft(k){return `color-mix(in srgb, ${typeColor(k)} 12%, var(--panel))`;}
 const uid=()=>Math.random().toString(36).slice(2,9);
 function def(){
-  return {students:[],exams:[],todos:[],behaviors:[],seatCfg:{rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],row0Merge:{},tagSide:"left",leaders:{}},seating:null,seatZones:null,seatFixed:null,
+  return {students:[],exams:[],todos:[],behaviors:[],seatCfg:{rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],studyNames:{},row0Merge:{},tagSide:"left",leaders:{}},seating:null,seatZones:null,seatFixed:null,
     behTypes:DEFAULT_BEH_TYPES(),
     gradeRules:DEFAULT_GRADE_RULES(),
     points:{scores:{},logs:[]},groups:[],
-    /* 抽签：drawn = 本轮已抽学生；puns = 自定义惩罚项；punLogs = 惩罚抽取记录（只抽惩罚，不关涉学生） */
-    lottery:{drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]},
+    /* 抽签：drawn = 本轮已抽学生；drawTypes = 抽取类型（每种含自定义类别）；drawLogs = 抽取记录 */
+    lottery:{drawn:[],allowRepeat:false,drawTypes:DEFAULT_DRAW_TYPES(),drawLogs:[]},
     redeem:DEFAULT_REDEEM(),
+    /* 班费支出：{id,date,item,amount,note} 按时间逆序记录，自动累计总额 */
+    classFee:{logs:[]},
     /* 课表：cells 键 "周几-节次"（节次为数字 1..12；早自习=m，晚自习=e）
        times[p]={s,e} 每节次上课时间（含 m / e 早、晚自习）；早/晚自习行「有课时」才显示，位置在首/尾 */
     schedule:{cells:{},times:{}},
@@ -697,12 +702,19 @@ function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d){const ba
   if(Array.isArray(d.work)&&!d._migrated){(d.work).forEach(w=>{base.todos.push({id:w.id||uid(),text:w.text||"",done:!!w.done,type:"事件",date:w.date||"",cat:w.cat||"",list:"以后",priority:"",due:""});});base._migrated=true;}
   delete base.work;
   /* 抽签：旧数据无 allowRepeat 字段 → 保持原有「不重复」行为 */
-  if(!base.lottery||typeof base.lottery!=="object")base.lottery={drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]};
+  if(!base.lottery||typeof base.lottery!=="object")base.lottery={drawn:[],allowRepeat:false,drawTypes:DEFAULT_DRAW_TYPES(),drawLogs:[]};
   if(!Array.isArray(base.lottery.drawn))base.lottery.drawn=[];
   if(base.lottery.allowRepeat===undefined)base.lottery.allowRepeat=false;
-  /* 惩罚抽取：旧数据补上自定义惩罚列表与记录 */
-  if(!Array.isArray(base.lottery.puns))base.lottery.puns=DEFAULT_PUNS();
-  if(!Array.isArray(base.lottery.punLogs))base.lottery.punLogs=[];
+  /* 类别抽取：旧数据补上抽取类型与抽取记录；并把旧「惩罚项」迁移成默认「惩罚抽取」类型、旧「惩罚记录」迁移成「抽取记录」 */
+  if(!Array.isArray(base.lottery.drawTypes)){
+    if(Array.isArray(base.lottery.puns)&&base.lottery.puns.length)
+      base.lottery.drawTypes=[{id:"dt_pun",name:"惩罚抽取",items:base.lottery.puns.map(p=>({id:p.id,name:p.name}))}];
+    else base.lottery.drawTypes=DEFAULT_DRAW_TYPES();
+  }
+  if(!Array.isArray(base.lottery.drawLogs)){
+    base.lottery.drawLogs=(base.lottery.punLogs||[]).map(l=>({id:l.id,typeId:"dt_pun",typeName:"惩罚抽取",studentId:l.studentId,stuName:l.stuName,itemId:l.punId,itemName:l.name,time:l.time,done:l.done}));
+  }
+  delete base.lottery.puns;delete base.lottery.punLogs;
   /* 旧版单值 bigGroup(等分) → bigGroups(数组，按列均分首版) */
   if(base.seatCfg&&base.seatCfg.bigGroup!==undefined&&!Array.isArray(base.seatCfg.bigGroups)){
     const bg=Math.max(1,Math.min(base.seatCfg.cols,base.seatCfg.bigGroup|0||3));
@@ -757,6 +769,9 @@ function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d){const ba
   if(!Array.isArray(base.redeem.cats))base.redeem.cats=[];
   if(!Array.isArray(base.redeem.items))base.redeem.items=[];
   if(!Array.isArray(base.redeem.logs))base.redeem.logs=[];
+  /* 班费支出：老数据无 classFee 字段 → 给默认结构 */
+  if(!base.classFee||typeof base.classFee!=="object")base.classFee={logs:[]};
+  if(!Array.isArray(base.classFee.logs))base.classFee.logs=[];
   /* 老数据迁移：旧的 repeat 字符串（每天/每周/每月）→ repN + repU 两个字段 */
   if(Array.isArray(base.todos))base.todos.forEach(t=>{
     if(t&&t.repN===undefined){const r=String(t.repeat||"");
@@ -858,18 +873,19 @@ function clearAllAsk(){
 /* ============ nav ============ */
 const NAV=[
   {r:"home",t:"首页",ic:"🏠"},
+  {r:"roster",t:"学生名册",ic:"👥"},
+  {r:"grades",t:"成绩管理",ic:"📊"},
   {r:"seating",t:"排位",ic:"🪑"},
-  {r:"todos",t:"事务安排",ic:"✅"},
-  {r:"memo",t:"备忘录",ic:"📌"},
   {r:"behavior",t:"行为记录",ic:"📝"},
   {r:"behtypes",t:"行为类别",ic:"🏷️",hide:true},
-  {r:"grades",t:"成绩管理",ic:"📊"},
-  {r:"roster",t:"学生名册",ic:"👥"},
   {r:"points",t:"积分",ic:"⭐"},
-  {r:"lottery",t:"抽签",ic:"🎲"},
   {r:"tiers",t:"学生等级",ic:"🏅"},
+  {r:"lottery",t:"抽签",ic:"🎲"},
+  {r:"fee",t:"班费支出",ic:"💰"},
   {r:"schedule",t:"课表",ic:"📅"},
   {r:"jobs",t:"班级工作",ic:"🧹"},
+  {r:"todos",t:"事务安排",ic:"✅"},
+  {r:"memo",t:"备忘录",ic:"📌"},
   {r:"data",t:"数据",ic:"🗄️"}
 ];
 function buildNav(){
@@ -941,7 +957,12 @@ function ddLeft(date){if(!date)return 99;const a=new Date(todayStr());const b=ne
 function openModal(html){document.getElementById("modal").innerHTML=html;$("#mask").classList.add("show");}
 function closeModal(){$("#mask").classList.remove("show");$("#modal").innerHTML="";}
 function toast(msg){const t=document.createElement("div");t.textContent=msg;t.style.cssText="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;z-index:99;font-size:13px;box-shadow:var(--shadow-2)";document.body.appendChild(t);setTimeout(()=>t.remove(),1800);}
-function refresh(){route();}
+function keepScroll(fn){
+  const top=window.pageYOffset||document.documentElement.scrollTop||document.body.scrollTop||0;
+  fn();
+  setTimeout(()=>window.scrollTo(0,top),0);
+}
+function refresh(){keepScroll(route);}
 
 /* ============ router ============ */
 const routes={
@@ -949,7 +970,7 @@ const routes={
   grades:v=>{trendSub=null;trendMark=null;viewGrades(v);},/* 进入成绩管理页默认显示全部科目；图例点选仅会话内生效 */
   todos:viewTasks, behavior:viewBehavior, memo:viewMemo,
   seating:viewSeating, tiers:viewTiers, points:viewPoints, lottery:viewLottery, schedule:viewSchedule,
-  jobs:viewJobs, behtypes:viewBehTypes, data:viewData
+  fee:viewFee, jobs:viewJobs, behtypes:viewBehTypes, data:viewData
 };
 function route(){
   const h=(location.hash||"#home").replace("#","");
@@ -973,7 +994,8 @@ const SUB={
   home:"今日待办、快捷操作与最近动态", memo:"随时记录要记住的事，可置顶并同步到首页", roster:"班级学生花名册，支持导入与搜索",
   grades:"按考试录入成绩并自动排名", todos:"班级日常事务与固定日期的工作安排，合并管理", behavior:"表扬、违纪、请假等记录",
   seating:"教室座位排布与轮换", tiers:"成绩+积分−身高 加权计算 A/B/C 等级",
-  points:"个人与小组积分榜", lottery:"随机抽人 + 自定义惩罚抽取",
+  points:"个人与小组积分榜",   lottery:"随机抽人 + 自定义类型抽取",
+  fee:"记录班费支出，自动统计总额",
   schedule:"本周课程表",
   jobs:"科任老师 + 班级管理职务 + 历史任职",
   behtypes:"表扬、违纪等类别与默认分值，可导入导出复用",
@@ -1228,6 +1250,7 @@ function buildRecent(){
     list.push({t:b.time,dot:col,txt:`${esc(studentName(b.studentId))} ${tag}${dBadge?` ${dBadge}`:''}${reason}`});
   });
   S.points.logs.forEach(p=>{
+    if(String(p.reason||"").startsWith("行为·"))return; /* 行为记录已在 S.behaviors 中展示，避免首页最近记录重复 */
     const c=p.delta>=0?"var(--ok)":"var(--bad)";
     const sign=p.delta>0?"+":"";
     const reason=p.reason?` · ${esc(p.reason)}`:'';
@@ -1992,6 +2015,7 @@ let seatCfgOpen=false;/* 座位排数/列数/大组/学习组等设置行默认�
 function toCNum(n){const c=["零","一","二","三","四","五","六","七","八","九","十"];if(n<=10)return c[n];if(n<20)return "十"+c[n-10];if(n<100){const t=Math.floor(n/10),o=n%10;return c[t===1?"":t-0===1?"":t]+"十"+(o?c[o]:"");}return String(n);}
 function viewSeating(v){
   const cfg=S.seatCfg;
+  if(!cfg.studyNames||typeof cfg.studyNames!=="object")cfg.studyNames={};/* 学习组自定义名：基础组名 → 自定义名 */
   const _nTotal=(cfg.rows+(cfg.row0?1:0))*cfg.cols;/* 第0排开启时多一行 */
   if(!S.seating||S.seating.length!==_nTotal){S.seating=new Array(_nTotal).fill(null);}
   if(!S.seatZones||S.seatZones.length!==_nTotal){S.seatZones=new Array(_nTotal).fill(null);}
@@ -2131,12 +2155,16 @@ function viewSeating(v){
       const bands=m.tags.map(t=>bandByName[t]).filter(Boolean);
       return {m,bands,hostGi:bands.length?Math.min(...bands.map(b=>b[0])):-1};
     });
-    /* 段显示名：合并段可用自定义名 m.name，否则回落到位置名 buildName(gi,s) */
+    /* 段显示名：合并段优先用自定义名 m.name；独立段可用 studyNames 自定义名；否则回落位置名 buildName(gi,s) */
+    const studyNames=cfg.studyNames||{};
     const nameOfBand=(gi,s)=>{
       const bn=buildName(gi,s);
       const m=studyMerges.find(x=>x&&Array.isArray(x.tags)&&x.tags.includes(bn));
-      return (m&&m.name&&String(m.name).trim())?String(m.name).trim():bn;
+      if(m&&m.name&&String(m.name).trim())return String(m.name).trim();
+      const sn=studyNames[bn]&&String(studyNames[bn]).trim();
+      return sn?sn:bn;
     };
+    const dispOf=bn=>{const sn=studyNames[bn]&&String(studyNames[bn]).trim();return sn?sn:bn;};
     /* 拖拽属性：mergeMode 下禁用拖拽（改为点选合并）；bands 格式 "gi:s,gi:s" */
     const dragAttrs=b=>mergeMode?"":`draggable="true" ondragstart="W.tagDragStart(event,'${b}')" ondragend="W.tagDragEnd(event)" ondragover="event.preventDefault()" ondrop="W.tagDrop(event,'${b}')" ondragenter="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')"`;
     let out="";
@@ -2178,7 +2206,9 @@ function viewSeating(v){
         if(b.idxEnd<b.idxStart)return;
         const click=mergeMode?`onclick="W.toggleMergeSel('${esc(b.tagName)}')"`:'';
         const sel=mergeMode && mergeSel.has(b.tagName)?' sel':'';
-        out+=`<div class="st-tag${sel}" ${dragAttrs(gi+":"+b.s)} style="grid-column:${tagTracks[gi]};grid-row:${2*b.idxStart+1} / ${2*b.idxEnd+2}" ${click} title="${esc(b.tagName)} · ${b.idxEnd-b.idxStart+1}排${leaderTip(gi+":"+b.s)}"><span class="st-txt">${esc(b.tagName)}</span></div>`;
+        const dispName=dispOf(b.tagName);
+        const btns=`<span class="st-btns"><button class="st-split" onclick="event.stopPropagation();W.renameStudyGroup('${esc(b.tagName)}')" title="自定义这个学习组的组名">名</button></span>`;
+        out+=`<div class="st-tag${sel}" ${dragAttrs(gi+":"+b.s)} style="grid-column:${tagTracks[gi]};grid-row:${2*b.idxStart+1} / ${2*b.idxEnd+2}" ${click} title="${esc(dispName)} · ${b.idxEnd-b.idxStart+1}排${leaderTip(gi+":"+b.s)}"><span class="st-txt">${esc(dispName)}</span>${btns}</div>`;
       });
       /* 第0排标签：未并入时始终显示；合并模式下始终显示（含已并入态，便于点击切换归入） */
       if(row0&&(mergeMode||(cfg.row0Merge||{})[gi]===undefined||(cfg.row0Merge||{})[gi]<0)){
@@ -2597,7 +2627,7 @@ function redeemSectionHtml(){
     ${logHtml}
   </div>`;
 }
-W.setRdmFilter=val=>{redeemCatFilter=val||"all";viewPoints(document.getElementById("view"));};
+W.setRdmFilter=val=>{redeemCatFilter=val||"all";keepScroll(()=>viewPoints(document.getElementById("view")));};
 /* 撤销一条兑换/消除记录：复原其积分影响（标记 cancelled，rdmRewardSpent/rdmForgiven 已排除），reward 有限量时退回库存；记录保留为「已撤销」 */
 W.rdmUndo=id=>{
   const R=ensureRedeem();const l=(R.logs||[]).find(x=>x.id===id);if(!l)return;
@@ -2740,7 +2770,7 @@ W.rdmRefresh=()=>{const b=document.getElementById("m_rdmBody");if(b)b.innerHTML=
 W.manageRedeem=()=>{openModal(`<h3>管理兑换分类与项目</h3>
     <div id="m_rdmBody">${redeemMgrHtml()}</div>
     <div class="foot"><button class="btn" onclick="W.closeRedeemMgr()">完成</button></div>`);};
-W.closeRedeemMgr=()=>{save();closeModal();if((location.hash||"")==="#points")viewPoints(document.getElementById("view"));};
+W.closeRedeemMgr=()=>{save();closeModal();if((location.hash||"")==="#points")keepScroll(()=>viewPoints(document.getElementById("view")));};
 W.rdmAddCat=()=>{ensureRedeem().cats.push({id:uid(),name:"新分类"});save();W.rdmRefresh();};
 W.rdmRenameCat=(id,v)=>{
   const R=ensureRedeem();const c=el(id,R.cats);if(!c)return;
@@ -2788,41 +2818,77 @@ function refreshLotLists(){
   const el=document.getElementById("lotLists");if(el)el.innerHTML=lotListsHtml();
   const btn=document.getElementById("drawBtn");if(btn)btn.disabled=lotRemain()<=0;
 }
-/* ---- 惩罚抽取：列表 / 记录 ---- */
-function lotPuns(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.puns))cfg.puns=DEFAULT_PUNS();return cfg.puns;}
-function lotPunLogs(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.punLogs))cfg.punLogs=[];return cfg.punLogs;}
-function punLogsHtml(){
-  const logs=lotPunLogs(),puns=lotPuns();
+/* ---- 类别抽取：类型 / 类别 / 记录 ---- */
+function lotDrawTypes(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.drawTypes))cfg.drawTypes=DEFAULT_DRAW_TYPES();return cfg.drawTypes;}
+function lotDrawType(id){return lotDrawTypes().find(t=>t.id===id)||null;}
+function lotDrawLogs(){const cfg=S.lottery||(S.lottery={});if(!Array.isArray(cfg.drawLogs))cfg.drawLogs=[];return cfg.drawLogs;}
+/* 学生范围选项：全体学生 → 各大组（一大组 / 二大组 / …） → 每一个学生（按名册顺序） */
+function dtScopeOptions(){
+  const cfg=S.seatCfg||{};
+  const bgN=Array.isArray(cfg.bigGroups)&&cfg.bigGroups.length?cfg.bigGroups.length:0;
+  const opts=[{v:"all",t:"全体学生"}];
+  for(let i=0;i<bgN;i++)opts.push({v:"bg"+(i+1),t:toCNum(i+1)+"大组"});
+  S.students.forEach(s=>opts.push({v:"stu:"+s.id,t:s.name}));
+  return opts;
+}
+/* 学生所属大组（1-based），从座位学习组名推导（如「一A组」→ 1）；未排座返回 0 */
+function bigGroupIndexOf(s){
+  const g=(s&&s.g||"").trim();
+  if(!g)return 0;
+  const m={"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9};
+  return m[g.charAt(0)]||0;
+}
+/* 按范围取候选学生：all=全部；bgN=第 N 大组；stu:<id>=某一个学生 */
+function dtStudentPool(scope){
+  if(!scope||scope==="all")return S.students.slice();
+  const sc=String(scope);
+  if(sc.indexOf("stu:")===0){const id=sc.slice(4);const s=S.students.find(x=>x.id===id);return s?[s]:[];}
+  const gi=parseInt(sc.replace("bg",""),10)||0;
+  if(!gi)return S.students.slice();
+  return S.students.filter(s=>bigGroupIndexOf(s)===gi);
+}
+function drawLogsHtml(){
+  const logs=lotDrawLogs(),types=lotDrawTypes();
   const recent=logs.slice().reverse().slice(0,40);
   const doneN=logs.filter(l=>l.done).length;
   const head=`<div class="between row wrap" style="margin-bottom:10px">
-      <span class="section-title" style="margin:0">惩罚记录（${logs.length}${logs.length?` · 已完成 ${doneN}`:""}）</span>
-      ${logs.length?`<button class="btn ghost sm h30" onclick="W.clearPunLogs()">清空记录</button>`:""}
+      <span class="section-title" style="margin:0">抽取记录（${logs.length}${logs.length?` · 已完成 ${doneN}`:""}）</span>
+      ${logs.length?`<button class="btn ghost sm h30" onclick="W.clearDrawLogs()">清空记录</button>`:""}
     </div>`;
-  if(!recent.length)return head+`<div class="empty">还没有惩罚记录</div>`;
-  return head+recent.map((l,i)=>`<div class="pun-log${l.done?" done":""}">
-      <label class="chk" title="${l.done?"已完成，点此取消":"打勾表示惩罚已执行"}">
-        <input type="checkbox" ${l.done?"checked":""} onchange="W.togglePunDone('${l.id}')">
+  if(!recent.length)return head+`<div class="empty">还没有抽取记录</div>`;
+  return head+recent.map((l,i)=>{
+    /* 兼容旧记录（单人）：无 scope 时按单人展示 */
+    const hasScope=!!l.scopeLabel||Array.isArray(l.students);
+    const scopeLabel=l.scopeLabel||"";
+    const names=l.stuName||studentName(l.studentId);
+    const cnt=l.count||(Array.isArray(l.students)?l.students.length:1);
+    const head2=hasScope?`<b>${esc(scopeLabel)}</b> · ${cnt}人`:`<b>${esc(names)}</b>`;
+    return `<div class="pun-log${l.done?" done":""}">
+      <label class="chk" title="${l.done?"已完成，点此取消":"打勾表示已执行"}">
+        <input type="checkbox" ${l.done?"checked":""} onchange="W.toggleDrawDone('${l.id}')">
       </label>
       <span class="no">${logs.length-i}</span>
       <div class="txt" style="flex:1;min-width:0">
-        <div><b>${esc(l.stuName||studentName(l.studentId))}</b> · ${esc(l.name||"")}</div>
+        <div>${head2} · ${esc(l.typeName||"")} · <b>${esc(l.itemName||"")}</b></div>
+        <div class="tiny muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(names)}</div>
         <div class="tiny muted">${esc(l.time||"")}${l.done?` · <span style="color:var(--ok)">已完成</span>`:""}</div>
       </div>
-    </div>`).join("");
+      <button class="btn ghost sm h24" style="flex:none" onclick="W.delDrawLog('${l.id}')" title="删除这条抽取记录">删除</button>
+    </div>`;
+  }).join("");
 }
-function refreshPunLists(){
-  const el=document.getElementById("punLists");if(el)el.innerHTML=punLogsHtml();
-  const btn=document.getElementById("punBtn");if(btn)btn.disabled=!(lotPuns().length&&S.students.length);
+function refreshDrawLists(){
+  const el=document.getElementById("drawLists");if(el)el.innerHTML=drawLogsHtml();
+  const btn=document.getElementById("drawCatBtn");if(btn)btn.disabled=!(lotDrawTypes().length&&S.students.length);
 }
 function viewLottery(v){
-  const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false,puns:DEFAULT_PUNS(),punLogs:[]});
+  const cfg=S.lottery||(S.lottery={drawn:[],allowRepeat:false,drawTypes:DEFAULT_DRAW_TYPES(),drawLogs:[]});
   if(!Array.isArray(cfg.drawn))cfg.drawn=[];
-  if(!Array.isArray(cfg.puns))cfg.puns=DEFAULT_PUNS();
-  if(!Array.isArray(cfg.punLogs))cfg.punLogs=[];
+  if(!Array.isArray(cfg.drawTypes))cfg.drawTypes=DEFAULT_DRAW_TYPES();
+  if(!Array.isArray(cfg.drawLogs))cfg.drawLogs=[];
   const rep=!!cfg.allowRepeat;
   const remain=lotRemain();
-  const puns=cfg.puns,logs=cfg.punLogs;
+  const types=cfg.drawTypes,logs=cfg.drawLogs;
   const last=logs.length?logs[logs.length-1]:null;
   v.innerHTML=`
   <div class="card pad" style="margin-bottom:14px">
@@ -2838,19 +2904,23 @@ function viewLottery(v){
   <div class="card pad" id="lotLists">${lotListsHtml()}</div>
   <div class="card pad" style="margin-top:14px">
     <div class="between row wrap" style="margin-bottom:10px">
-      <span class="section-title" style="margin:0">惩罚抽取</span>
-      <button class="btn ghost sm h30" onclick="W.managePuns()">管理惩罚</button>
+      <span class="section-title" style="margin:0">类型抽取</span>
+      <button class="btn ghost sm h30" onclick="W.manageDrawTypes()">管理类型</button>
     </div>
     <div class="field" style="margin-bottom:10px">
-      <label class="lbl">学生</label>
-      ${S.students.length?`<select class="fld h30" id="punStu" style="width:100%">${S.students.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>`:`<div class="tiny muted">名册里还没有学生</div>`}
+      <label class="lbl">抽取类型</label>
+      ${types.length?`<select class="fld h30" id="dtType" style="width:100%">${types.map(t=>`<option value="${t.id}">${esc(t.name)}（${t.items.length}）</option>`).join("")}</select>`:`<div class="tiny muted">还没有抽取类型，点「管理类型」添加</div>`}
     </div>
-    <div class="lottery-stage pun" id="punStage"><span class="lbl" id="punLbl">共 ${puns.length} 条惩罚${logs.length?` · 已抽 ${logs.length} 次`:""}</span>${last?esc(last.name):"🎯"}</div>
+    <div class="field" style="margin-bottom:10px">
+      <label class="lbl">学生范围</label>
+      <select class="fld h30" id="dtScope" style="width:100%">${dtScopeOptions().map(o=>`<option value="${o.v}">${o.t}</option>`).join("")}</select>
+    </div>
+    <div class="lottery-stage cat" id="catStage"><span class="lbl" id="catLbl">共 ${types.length} 种类型${logs.length?` · 已抽 ${logs.length} 次`:""}</span>${last?esc(last.itemName):"🎯"}</div>
     <div class="row" style="margin-top:14px;gap:8px;justify-content:flex-end">
-      <button class="btn" id="punBtn" onclick="W.drawPun()" ${(puns.length&&S.students.length)?"":"disabled"}>🎯 抽惩罚</button>
+      <button class="btn" id="drawCatBtn" onclick="W.drawCategory()" ${(types.length&&S.students.length)?"":"disabled"}>🎯 抽签</button>
     </div>
   </div>
-  <div class="card pad" id="punLists" style="margin-top:14px">${punLogsHtml()}</div>`;
+  <div class="card pad" id="drawLists" style="margin-top:14px">${drawLogsHtml()}</div>`;
 }
 
 /* ============ SCHEDULE ============ */
@@ -3927,6 +3997,7 @@ W.syncStudyGroups=()=>{
        - 非第 0 排：物理 studyIdx = Math.floor((idx0-?)/studyGroup)；
          合并段内统一用起点 tag 名命名（studyMerges 通过 tag 名匹配） */
   const studyMerges=Array.isArray(cfg.studyMerges)?cfg.studyMerges:[];
+  const studyNames=(cfg.studyNames&&typeof cfg.studyNames==="object")?cfg.studyNames:{};
   const row0Merge=cfg.row0Merge||{};
   /* 给定 (gi, physicalIdx) 返回用于命名的 tag 名：合并段则用起点 sIdx 重建的 name */
   const resolveTag=(gi,physicalIdx)=>{
@@ -3941,7 +4012,8 @@ W.syncStudyGroups=()=>{
         return firstTag;
       }
     }
-    return baseName;
+    const sn=studyNames[baseName]&&String(studyNames[baseName]).trim();
+    return sn?sn:baseName;
   };
   const nameOf=i=>{
     const idx0=Math.floor(i/cfg.cols),c=i%cfg.cols;
@@ -4025,6 +4097,23 @@ W.saveMergeName=(rawTags)=>{
   if(!m)return;
   const v=((document.getElementById("mg_name")||{}).value||"").trim();
   if(v)m.name=v;else delete m.name;
+  W.syncStudyGroups();save();closeModal();viewSeating(document.getElementById("view"));
+};
+/* 改名：独立（未合并）学习组可自定义组名；留空 → 回到默认位置名。存入 seatCfg.studyNames[基础组名] */
+W.renameStudyGroup=(baseName)=>{
+  const cfg=S.seatCfg;
+  if(!cfg.studyNames||typeof cfg.studyNames!=="object")cfg.studyNames={};
+  const cur=cfg.studyNames[baseName]||"";
+  openModal(`<h3>学习组组名</h3>
+    <div class="field"><label class="lbl">组名</label><input class="fld" id="sg_name" value="${esc(cur)}" placeholder="${esc(baseName)}" maxlength="12"></div>
+    <div class="tiny muted" style="margin:-4px 0 10px">留空则显示默认名「${esc(baseName)}」。座位表、名册与学习组榜的组名都会同步。</div>
+    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveStudyName('${esc(String(baseName).replace(/'/g,""))}')">保存</button></div>`);
+};
+W.saveStudyName=(baseName)=>{
+  const cfg=S.seatCfg;
+  if(!cfg.studyNames||typeof cfg.studyNames!=="object")cfg.studyNames={};
+  const v=((document.getElementById("sg_name")||{}).value||"").trim();
+  if(v)cfg.studyNames[baseName]=v;else delete cfg.studyNames[baseName];
   W.syncStudyGroups();save();closeModal();viewSeating(document.getElementById("view"));
 };
 /* 拆：按 tags 集合定位 studyMerges 中那段并删除 */
@@ -4318,8 +4407,9 @@ function termDelPlan(t){
     logs:S.points.logs.filter(l=>behIds.has(l.behId)||exids.includes(l.examId)||termDateIn(t,l.time)).length,
     exams:exids.length,
     todos:S.todos.filter(td=>termDateIn(t,td.date)||termDateIn(t,td.due)).length,
-    pun:lotPunLogs().filter(l=>termDateIn(t,l.time)).length,
-    rdm:((S.redeem&&S.redeem.logs)||[]).filter(l=>termDateIn(t,l.time)).length
+    draw:(S.lottery&&S.lottery.drawLogs||[]).filter(l=>termDateIn(t,l.time)).length,
+    rdm:((S.redeem&&S.redeem.logs)||[]).filter(l=>termDateIn(t,l.time)).length,
+    fee:((S.classFee&&S.classFee.logs)||[]).filter(l=>termDateIn(t,l.date)).length
   };
 }
 /* 执行删除：行为先扣回积分再删；积分日志按 behId / examId / 时间三路清除；考试连同成绩删除 */
@@ -4332,13 +4422,75 @@ function termDelApply(t){
   S.points.logs=S.points.logs.filter(l=>!behIds.has(l.behId)&&!exids.has(l.examId)&&!termDateIn(t,l.time));
   S.exams=S.exams.filter(x=>!exids.has(x.id));
   S.todos=S.todos.filter(td=>!termDateIn(t,td.date)&&!termDateIn(t,td.due));
-  if(S.lottery&&Array.isArray(S.lottery.punLogs))S.lottery.punLogs=S.lottery.punLogs.filter(l=>!termDateIn(t,l.time));
+  if(S.lottery&&Array.isArray(S.lottery.drawLogs))S.lottery.drawLogs=S.lottery.drawLogs.filter(l=>!termDateIn(t,l.time));
   if(S.redeem&&Array.isArray(S.redeem.logs))S.redeem.logs=S.redeem.logs.filter(l=>!termDateIn(t,l.time));
+  if(S.classFee&&Array.isArray(S.classFee.logs))S.classFee.logs=S.classFee.logs.filter(l=>!termDateIn(t,l.date));
 }
+/* ============ 班费支出 ============ */
+function viewFee(v){
+  const logs=((S.classFee&&S.classFee.logs)||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  const total=logs.reduce((s,l)=>s+(Number(l.amount)||0),0);
+  const list=logs.length?logs.map(l=>`
+    <div class="r-item" style="align-items:center">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${esc(l.item)}</div>
+        <div class="tiny muted" style="margin-top:2px">${esc(l.date||"")}${l.note?` · ${esc(l.note)}`:""}</div>
+      </div>
+      <span style="font-weight:700;color:var(--bad);white-space:nowrap;margin:0 6px">¥${(Number(l.amount)||0).toFixed(2)}</span>
+      <span class="r-act"><button class="del" onclick="W.delFee('${l.id}')">删</button></span>
+    </div>`).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">💰</div>还没有班费支出记录</div>`;
+  v.innerHTML=`
+  <div class="card pad" style="margin-bottom:14px">
+    <div class="between row" style="margin-bottom:12px">
+      <span class="section-title" style="margin:0">记一笔班费支出</span>
+      <span class="tiny muted">共 ${logs.length} 笔 · 累计 <b style="color:var(--ink)">¥${total.toFixed(2)}</b></span>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">日期</label>
+      <input class="fld h30" type="date" id="feeDate" style="width:100%" value="${todayStr()}">
+    </div>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">支出项目</label>
+      <input class="fld h30" id="feeItem" style="width:100%" placeholder="如：购买卫生工具">
+    </div>
+    <div class="row" style="gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1;min-width:0;margin:0"><label class="lbl">金额（元）</label>
+        <input class="fld h30" type="number" min="0" step="0.01" id="feeAmt" style="width:100%" placeholder="0.00">
+      </div>
+      <button class="btn h30" style="flex:none" onclick="W.addFee()">添加</button>
+    </div>
+    <div class="field" style="margin-top:10px;margin-bottom:0"><label class="lbl">备注（可选）</label>
+      <input class="fld h30" id="feeNote" style="width:100%" placeholder="经手人 / 说明">
+    </div>
+  </div>
+  <div class="card pad">
+    <div class="between row" style="margin-bottom:8px">
+      <span class="section-title" style="margin:0">支出明细（${logs.length}）</span>
+    </div>
+    ${list}
+  </div>`;
+  const it=$("#feeItem");if(it)it.focus();
+}
+W.addFee=()=>{
+  const date=($("#feeDate")&&$("#feeDate").value)||todayStr();
+  const item=($("#feeItem")&&$("#feeItem").value||"").trim();
+  const amtStr=($("#feeAmt")&&$("#feeAmt").value||"").trim();
+  const note=($("#feeNote")&&$("#feeNote").value||"").trim();
+  if(!item){toast("请输入支出项目");return;}
+  const amt=Number(amtStr);
+  if(!amtStr||isNaN(amt)||amt<0){toast("请输入有效金额");return;}
+  if(!S.classFee||!Array.isArray(S.classFee.logs))S.classFee={logs:[]};
+  S.classFee.logs.push({id:uid(),date,item,amount:amt,note});
+  save();route();toast("已记录班费支出");
+};
+W.delFee=id=>{
+  if(!confirm("删除这笔班费支出记录？"))return;
+  if(!S.classFee||!Array.isArray(S.classFee.logs))return;
+  S.classFee.logs=S.classFee.logs.filter(x=>x.id!==id);
+  save();route();
+};
 W.delTerm=id=>{
   const t=el(id,S.terms||[]);if(!t)return;
   const p=termDelPlan(t);
-  const items=[["行为记录",p.beh],["积分日志",p.logs],["考试(含成绩)",p.exams],["事务",p.todos],["惩罚记录",p.pun],["兑换/消除记录",p.rdm]].filter(x=>x[1]>0);
+  const items=[["行为记录",p.beh],["积分日志",p.logs],["考试(含成绩)",p.exams],["事务",p.todos],["抽取记录",p.draw],["兑换/消除记录",p.rdm],["班费支出",p.fee]].filter(x=>x[1]>0);
   const detail=items.length?items.map(x=>x[0]+" "+x[1]+" 条").join("、"):"该时间范围内没有数据";
   if(!confirm(`删除学期「${t.name}」（${t.start||"—"} 至 ${t.end||"—"}）？\n范围内的数据将一起删除：${detail}。\n此操作不可恢复，确定删除？`))return;
   termDelApply(t);
@@ -4750,7 +4902,7 @@ W.assignSeat=(i,sid)=>{
 };
 /* ---- 排位记录：把当前座位表保存为历史快照，可恢复 / 删除 ----
    快照内容 = seatCfg 全量（行列/大组/学习组/合并/组长）+ seating + seatZones + seatFixed。 */
-const SEAT_CFG_DEF=()=>({rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],row0Merge:{},tagSide:"left",leaders:{}});
+const SEAT_CFG_DEF=()=>({rows:8,cols:9,bigGroups:[3,2,4],studyGroup:2,sexAware:false,row0:false,studyMerges:[],studyNames:{},row0Merge:{},tagSide:"left",leaders:{}});
 W.saveSeatRecord=()=>{
   ensureSeat();
   if(!Array.isArray(S.seatHistory))S.seatHistory=[];
@@ -4837,83 +4989,157 @@ W.toggleLotRepeat=on=>{
   toast(on?"已开启：同一个人可以被重复抽中":"已关闭：每人本轮只抽一次");
 };
 W.resetLottery=()=>{S.lottery.drawn=[];save();viewLottery(document.getElementById("view"));};
-/* ---- 惩罚抽取：先确定学生，再随机抽一条惩罚 ---- */
-W.drawPun=()=>{
+/* ---- 类型抽取：先确定学生范围（全体 / 某个大组），再随机抽一个选项；整组接受抽取结果 ---- */
+W.drawCategory=()=>{
   if(punRollTimer)return; /* 正在滚动：忽略重复触发，避免并发入账 */
-  const puns=lotPuns();
-  if(!puns.length){toast("请先添加惩罚（点「管理惩罚」）");return;}
-  const sel=document.getElementById("punStu");
-  const sid=sel?sel.value:"";
-  if(!sid){toast("请先选择学生");return;}
-  const sname=studentName(sid);
-  const stage=$("#punStage"),btn=$("#punBtn");if(!stage)return;
+  const type=lotDrawType(($("#dtType")||{}).value);
+  if(!type||!type.items||!type.items.length){toast("请先添加抽取类型与选项（点「管理类型」）");return;}
+  const scope=($("#dtScope")||{}).value||"all";
+  const pool=dtStudentPool(scope);
+  if(!pool.length){toast(scope==="all"?"名册里还没有学生":`该范围暂无学生（请先在排位页排座）`);return;}
+  const scopeLabel=(dtScopeOptions().find(o=>o.v===scope)||{}).t||"全体学生";
+  const stage=$("#catStage"),btn=$("#drawCatBtn");if(!stage)return;
   if(btn)btn.disabled=true;stage.classList.add("roll");
   let ticks=0;const max=24;
   punRollTimer=setInterval(()=>{
-    const p=puns[Math.floor(Math.random()*puns.length)];
-    stage.innerHTML=`<span class="lbl">${esc(sname)} · 抽取中…</span>${esc(p.name)}`;
+    const it=type.items[Math.floor(Math.random()*type.items.length)];
+    stage.innerHTML=`<span class="lbl">${esc(scopeLabel)} · 抽取中…</span>${esc(it.name)}`;
     ticks++;
     if(ticks>=max){
       clearInterval(punRollTimer);punRollTimer=null;
-      const pick=puns[Math.floor(Math.random()*puns.length)];
+      const pick=type.items[Math.floor(Math.random()*type.items.length)];
       const time=nowStr();
-      /* 学生先确定下来，只有惩罚是随机抽的；学生名一并快照，防止日后改名/删除导致记录读到空 */
-      lotPunLogs().push({id:uid(),studentId:sid,stuName:sname,punId:pick.id,name:pick.name,time:time});
+      /* 抽查一个选项，范围里的每个人（全体学生 = 所有人；一大组 = 该组所有人）都接受这个结果。
+         每次抽取生成一条记录，名单快照该范围内全部学生（含姓名），防止日后改名/删除导致读到空。 */
+      const students=pool.map(s=>({id:s.id,name:s.name}));
+      const names=students.length<=8?students.map(s=>s.name).join("、"):(students.slice(0,8).map(s=>s.name).join("、")+"…");
+      lotDrawLogs().push({
+        id:uid(),typeId:type.id,typeName:type.name,
+        studentId:students[0]?students[0].id:"",stuName:names,
+        students:students,scope:scope,scopeLabel:scopeLabel,count:students.length,
+        itemId:pick.id,itemName:pick.name,time:time,done:false
+      });
       save();
       stage.classList.remove("roll");
-      /* 抽中的惩罚留在舞台上，直到下一次抽取或重新进入本页 */
-      stage.innerHTML=`<span class="lbl">本次惩罚 · ${esc(sname)} · ${esc(time)}</span>${esc(pick.name)}`;
-      refreshPunLists();
-      if(btn)btn.disabled=!(lotPuns().length&&S.students.length);
+      /* 抽中的选项留在舞台上，直到下一次抽取或重新进入本页 */
+      stage.innerHTML=`<span class="lbl">本次抽取 · ${esc(scopeLabel)}（${students.length}人） · ${esc(type.name)} · ${esc(time)}</span>${esc(pick.name)}`;
+      refreshDrawLists();
+      if(btn)btn.disabled=!(lotDrawTypes().length&&S.students.length);
     }
   },60);
 };
-/* ---- 管理惩罚（自定义增删改） ---- */
-W.managePuns=()=>{
-  const puns=lotPuns();
-  const rows=puns.map(p=>`<div class="row" style="gap:6px;margin-bottom:6px">
-      <input class="fld h30" style="flex:1;min-width:0" value="${esc(p.name)}" onchange="W.punRename('${p.id}',this.value)">
-      <button class="btn ghost sm h30" style="flex:none" onclick="W.punDel('${p.id}')">删除</button>
-    </div>`).join("")||`<div class="empty">还没有惩罚，在下方添加</div>`;
-  openModal(`<h3>管理惩罚</h3>
-    <div class="tiny muted" style="margin:2px 0 10px">惩罚抽取会从下面的列表里随机抽一条，可随时改名、删除或新增。</div>
-    <div style="max-height:46vh;overflow:auto">${rows}</div>
-    <div class="field" style="margin-top:12px"><label class="lbl">新增惩罚</label>
+/* ---- 管理抽取类型（列表：类型标题 + 折叠展开的选项；图标按钮无边框，条目虚线分隔，默认折叠） ---- */
+let dtOpenSet=new Set();     /* 已展开的类型 id（默认全部折叠） */
+let dtEditTypeId=null;       /* 正在编辑名称的类型 id */
+let dtEditItemId=null;       /* 正在编辑名称的选项 id */
+W.manageDrawTypes=()=>{
+  const types=lotDrawTypes();
+  /* 图标按钮：无边框，间距由 .ic-row 的 gap:16px 控制 */
+  const ib=(ch,title,onclick,cls)=>`<button class="ic-btn${cls?" "+cls:""}" title="${esc(title)}" onclick="${onclick}">${ch}</button>`;
+  const rows=types.map((t,ti)=>{
+    const open=dtOpenSet.has(t.id);
+    const editing=dtEditTypeId===t.id;
+    const topBorder=ti>0?"border-top:1px dashed var(--line);":"";
+    /* 类型标题行：非编辑态为纯文字 + 图标按钮；编辑态为输入框 + 保存/取消 */
+    const head=editing
+      ? `<div class="row" style="gap:8px"><input class="fld h30" id="dt_name_input" style="flex:1;min-width:0" value="${esc(t.name)}" onkeydown="if(event.key==='Enter'){event.preventDefault();W.drawTypeSave('${t.id}')}"><button class="btn sm h30" style="flex:none" onclick="W.drawTypeSave('${t.id}')">保存</button><button class="btn ghost sm h30" style="flex:none" onclick="W.drawTypeCancel()">取消</button></div>`
+      : `<div class="row" style="gap:8px"><span style="flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name)}</span><span class="ic-row">${ib("✎","编辑名称",`W.drawTypeEdit('${t.id}')`)}${ib("＋","添加选项",`W.drawItemAdd('${t.id}')`)}${ib("🗑","删除类型",`W.drawTypeDel('${t.id}')`)}${ib(open?"▾":"▸",open?"折叠":"展开",`W.drawTypeToggle('${t.id}')`)}</span></div>`;
+    /* 选项行：非编辑态为纯文字 + 编辑/删除图标；编辑态为输入框 + 保存/取消 */
+    const items=open?((t.items||[]).map((it,ii)=>{
+      const ie=dtEditItemId===it.id;
+      const oh=ie
+        ? `<div class="row" style="gap:8px"><input class="fld h30" id="dt_item_input" style="flex:1;min-width:0" value="${esc(it.name)}" onkeydown="if(event.key==='Enter'){event.preventDefault();W.drawItemSave('${t.id}','${it.id}')}"><button class="btn sm h30" style="flex:none" onclick="W.drawItemSave('${t.id}','${it.id}')">保存</button><button class="btn ghost sm h30" style="flex:none" onclick="W.drawItemCancel()">取消</button></div>`
+        : `<div class="row" style="gap:8px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.name)}</span><span class="ic-row">${ib("✎","编辑选项",`W.drawItemEdit('${t.id}','${it.id}')`)}${ib("🗑","删除选项",`W.drawItemDel('${t.id}','${it.id}')`)}</span></div>`;
+      return `<div class="dt-opt" style="${ii>0?"border-top:1px dashed var(--line);":""}">${oh}</div>`;
+    }).join("")||`<div class="tiny muted" style="padding:9px 0 9px 16px">还没有选项，点「＋」新增</div>`):"";
+    return `<div class="dt-block" style="${topBorder}">${head}${items}</div>`;
+  }).join("")||`<div class="empty">还没有抽取类型，在下方添加</div>`;
+  openModal(`<h3>管理抽取类型</h3>
+    <div class="tiny muted" style="margin:2px 0 10px">类型 = 抽取大类（如「才艺展示」），其下每个选项都是可抽取的项。抽取时从所选类型里随机抽一个选项，范围内的学生一起接受这个结果。</div>
+    <div style="max-height:54vh;overflow:auto">${rows}</div>
+    <div class="field" style="margin-top:12px"><label class="lbl">新增类型</label>
       <div class="row" style="gap:6px">
-        <input class="fld h30" style="flex:1;min-width:0" id="m_pun_new" placeholder="如：罚抄课文 1 遍">
-        <button class="btn sm h30" style="flex:none" onclick="W.punAdd()">添加</button>
+        <input class="fld h30" style="flex:1;min-width:0" id="m_dt_new" placeholder="如：才艺展示">
+        <button class="btn sm h30" style="flex:none" onclick="W.drawTypeAdd()">添加</button>
       </div></div>
-    <div class="foot"><button class="btn" onclick="W.punClose()">完成</button></div>`);
+    <div class="foot"><button class="btn" onclick="W.drawTypeClose()">完成</button></div>`);
+  /* 进入编辑态后自动聚焦并全选，方便直接改名 */
+  setTimeout(()=>{const el=dtEditTypeId?document.getElementById("dt_name_input"):(dtEditItemId?document.getElementById("dt_item_input"):null);if(el){el.focus();el.select();}},0);
 };
-W.punAdd=()=>{
-  const inp=document.getElementById("m_pun_new");if(!inp)return;
+W.drawTypeToggle=id=>{if(dtOpenSet.has(id))dtOpenSet.delete(id);else dtOpenSet.add(id);dtEditTypeId=null;dtEditItemId=null;W.manageDrawTypes();};
+W.drawTypeEdit=id=>{dtEditTypeId=id;dtEditItemId=null;W.manageDrawTypes();};
+W.drawTypeCancel=()=>{dtEditTypeId=null;W.manageDrawTypes();};
+W.drawTypeSave=id=>{
+  const t=lotDrawTypes().find(x=>x.id===id);if(!t)return;
+  const inp=document.getElementById("dt_name_input");const n=((inp&&inp.value)||"").trim();
+  if(!n){toast("名称不能为空");return;}
+  if(lotDrawTypes().some(x=>x.id!==id&&x.name===n)){toast("已有同名类型");return;}
+  t.name=n;dtEditTypeId=null;save();W.manageDrawTypes();
+};
+W.drawTypeAdd=()=>{
+  const inp=document.getElementById("m_dt_new");if(!inp)return;
   const n=(inp.value||"").trim();
-  if(!n){toast("请填写惩罚内容");return;}
-  const puns=lotPuns();
-  if(puns.some(p=>p.name===n)){toast("已有同名惩罚");return;}
-  puns.push({id:uid(),name:n});
-  save();W.managePuns();
+  if(!n){toast("请填写类型名称");return;}
+  const types=lotDrawTypes();
+  if(types.some(t=>t.name===n)){toast("已有同名类型");return;}
+  const t={id:uid(),name:n,items:[]};types.push(t);
+  dtOpenSet.add(t.id);dtEditTypeId=null;dtEditItemId=null;/* 新建类型默认展开，便于添加选项 */
+  save();W.manageDrawTypes();
 };
-W.punRename=(id,val)=>{
-  const p=lotPuns().find(x=>x.id===id);if(!p)return;
-  const n=(val||"").trim();
-  if(!n){toast("名称不能为空");W.managePuns();return;}
-  p.name=n;save();W.managePuns();
+W.drawTypeDel=id=>{
+  if(!confirm("删除这个抽取类型？其下选项一并删除，已生成的抽取记录会保留。"))return;
+  const cfg=S.lottery;cfg.drawTypes=lotDrawTypes().filter(x=>x.id!==id);
+  dtOpenSet.delete(id);
+  if(dtEditTypeId===id)dtEditTypeId=null;
+  save();W.manageDrawTypes();
 };
-W.punDel=id=>{
-  if(!confirm("删除这条惩罚？已抽取的惩罚记录会保留。"))return;
-  const cfg=S.lottery;cfg.puns=lotPuns().filter(x=>x.id!==id);
-  save();W.managePuns();
+W.drawTypeClose=()=>{dtEditTypeId=null;dtEditItemId=null;closeModal();viewLottery(document.getElementById("view"));};
+/* 选项（类型下可抽取的项）：添加 / 编辑 / 删除 */
+W.drawItemAdd=tid=>{
+  const t=lotDrawTypes().find(x=>x.id===tid);if(!t)return;
+  t.items=t.items||[];
+  const it={id:uid(),name:""};t.items.push(it);
+  dtOpenSet.add(tid);
+  dtEditTypeId=null;dtEditItemId=it.id;
+  save();W.manageDrawTypes();
 };
-W.punClose=()=>{closeModal();viewLottery(document.getElementById("view"));};
-/* 惩罚记录：勾选 = 该次惩罚已执行完成（不勾选即未完成） */
-W.togglePunDone=id=>{
-  const l=lotPunLogs().find(x=>x.id===id);if(!l)return;
-  l.done=!l.done;save();refreshPunLists();
+W.drawItemEdit=(tid,iid)=>{dtEditItemId=iid;dtEditTypeId=null;W.manageDrawTypes();};
+W.drawItemCancel=()=>{
+  /* 取消：若正在编辑的是一个尚未命名的空白新项，则一并移除 */
+  if(dtEditItemId){
+    const t=lotDrawTypes().find(x=>(x.items||[]).some(i=>i.id===dtEditItemId));
+    if(t){const idx=t.items.findIndex(i=>i.id===dtEditItemId);if(idx>=0&&!t.items[idx].name){t.items.splice(idx,1);save();}}
+  }
+  dtEditItemId=null;W.manageDrawTypes();
 };
-W.clearPunLogs=()=>{
-  if(!confirm("清空全部惩罚记录？"))return;
-  S.lottery.punLogs=[];save();viewLottery(document.getElementById("view"));
+W.drawItemSave=(tid,iid)=>{
+  const t=lotDrawTypes().find(x=>x.id===tid);if(!t)return;
+  const idx=(t.items||[]).findIndex(i=>i.id===iid);
+  if(idx<0){dtEditItemId=null;W.manageDrawTypes();return;}
+  const inp=document.getElementById("dt_item_input");const n=((inp&&inp.value)||"").trim();
+  if(!n){t.items.splice(idx,1);dtEditItemId=null;save();W.manageDrawTypes();return;} /* 空白项 → 移除 */
+  if(t.items.some((i,k)=>k!==idx&&i.name===n)){toast("已有同名选项");return;}
+  t.items[idx].name=n;dtEditItemId=null;save();W.manageDrawTypes();
+};
+W.drawItemDel=(tid,id)=>{
+  const t=lotDrawTypes().find(x=>x.id===tid);if(!t)return;
+  t.items=t.items.filter(i=>i.id!==id);
+  if(dtEditItemId===id)dtEditItemId=null;
+  save();W.manageDrawTypes();
+};
+/* 抽取记录：勾选 = 该次抽取已执行完成（不勾选即未完成）；删除键可单独移除某条 */
+W.toggleDrawDone=id=>{
+  const l=lotDrawLogs().find(x=>x.id===id);if(!l)return;
+  l.done=!l.done;save();refreshDrawLists();
+};
+W.delDrawLog=id=>{
+  if(!confirm("删除这条抽取记录？"))return;
+  S.lottery.drawLogs=S.lottery.drawLogs.filter(l=>l.id!==id);
+  save();refreshDrawLists();
+};
+W.clearDrawLogs=()=>{
+  if(!confirm("清空全部抽取记录？"))return;
+  S.lottery.drawLogs=[];save();viewLottery(document.getElementById("view"));
 };
 /* 编辑一格：w="o"/"e" 时只编辑单/双周那一侧；周次切换后按目标侧写入 */
 const wSelHtml=sel=>`<div style="flex:1;min-width:0"><label class="lbl">周次</label><select class="fld" id="m_cw"><option value=""${!sel?" selected":""}>每周</option><option value="o"${sel==="o"?" selected":""}>单周</option><option value="e"${sel==="e"?" selected":""}>双周</option></select></div>`;
