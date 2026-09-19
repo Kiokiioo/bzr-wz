@@ -126,11 +126,12 @@ input.fld[type=time],input.fld[type=date]{min-width:0}
 ::-webkit-datetime-edit-millisecond-field,
 ::-webkit-datetime-edit-meridiem-field,
 ::-webkit-datetime-edit-ampm-field{padding:0;margin:0}
-/* Safari 下日期/时间控件默认 inline-flex，会忽略 width:100% 而按内容宽度撑开，
-   在窄弹窗里就会顶破右边的内边距。用 -webkit-fill-available 兜底强制铺满容器；
-   不支持该值的浏览器自动回落到上面的 100%。 */
+/* Safari 下日期/时间控件默认 inline-flex：旧版 iOS 会忽略 width:100% 而按内容宽度撑开，
+   于是顶破右边的内边距。这里用 width:100% + max-width:100% + min-width:0 三保险钉死：
+   认 100% 的版本按容器宽铺满，不认的版本也会被 max-width 卡住，绝不外溢。
+   注意：**不要**用 -webkit-fill-available —— iOS 上它按视口宽度解析，会直接把框撑出卡片。 */
 input.fld[type=date],input.fld[type=time],input.fld[type=datetime-local]{
-  width:100%;width:-webkit-fill-available;max-width:100%;min-width:0;text-align:left
+  width:100%;max-width:100%;min-width:0;text-align:left
 }
 ::-webkit-date-and-time-value{text-align:left;margin:0}
 /* 行为类型下拉（选择框+输入框）：下拉列出全部已设类别，支持手输新类型 */
@@ -573,7 +574,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
      保留原生外观——加 -webkit-appearance:none 会让 iOS 上日期选择器点不开。 */
   .modal input[type=datetime-local],
   .modal input[type=date],
-  .modal input[type=time]{padding:0 16px;height:36px;line-height:normal;width:100%;width:-webkit-fill-available;max-width:100%;min-width:0}
+  .modal input[type=time]{padding:0 16px;height:36px;line-height:normal;width:100%;max-width:100%;min-width:0}
 }
 /* 首页·今日课程卡片 */
 .cls-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
