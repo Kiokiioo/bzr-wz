@@ -111,6 +111,28 @@ input.fld:focus,select.fld:focus,textarea.fld:focus{border-color:var(--brand);bo
 /* 两列表单行：子项允许收缩到内容以下（date/time/select 的固有宽度会撑破窄弹窗） */
 .field.row>div{min-width:0}
 input.fld[type=time],input.fld[type=date]{min-width:0}
+/* iOS/Safari：date/time/datetime-local 的显示值由 Shadow DOM 渲染，其内部自带 padding，
+   会把文字顶偏，导致日期文字与同排普通输入框对不齐（做不到统一的左右内边距）。
+   这里只清零内部 padding；千万别用 -webkit-appearance:none，那会让 iOS 上的日期选择器点不开。 */
+::-webkit-datetime-edit,
+::-webkit-datetime-edit-fields-wrapper,
+::-webkit-datetime-edit-text,
+::-webkit-datetime-edit-month-field,
+::-webkit-datetime-edit-day-field,
+::-webkit-datetime-edit-year-field,
+::-webkit-datetime-edit-hour-field,
+::-webkit-datetime-edit-minute-field,
+::-webkit-datetime-edit-second-field,
+::-webkit-datetime-edit-millisecond-field,
+::-webkit-datetime-edit-meridiem-field,
+::-webkit-datetime-edit-ampm-field{padding:0;margin:0}
+/* Safari 下日期/时间控件默认 inline-flex，会忽略 width:100% 而按内容宽度撑开，
+   在窄弹窗里就会顶破右边的内边距。用 -webkit-fill-available 兜底强制铺满容器；
+   不支持该值的浏览器自动回落到上面的 100%。 */
+input.fld[type=date],input.fld[type=time],input.fld[type=datetime-local]{
+  width:100%;width:-webkit-fill-available;max-width:100%;min-width:0;text-align:left
+}
+::-webkit-date-and-time-value{text-align:left;margin:0}
 /* 行为类型下拉（选择框+输入框）：下拉列出全部已设类别，支持手输新类型 */
 .combobox{position:relative}
 .combobox .fld{padding-right:30px}
@@ -546,10 +568,12 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .modal .fld{height:36px;padding:16px}
   .modal textarea.fld{height:auto;min-height:80px;padding:12px 16px}
   .modal .combobox .fld{padding-right:34px}
-  /* iOS Safari：datetime-local/date/time 用原生控件时 padding 对内部文字不生效，去原生外观后 16px 内边距才撑得开 */
+  /* iOS Safari：日期/时间控件的显示值来自 Shadow DOM（内部自带 padding，已在上方清零），
+     这里把左右内边距钉死 16px 并撑满宽度，让日期文字与其它输入框左右对齐。
+     保留原生外观——加 -webkit-appearance:none 会让 iOS 上日期选择器点不开。 */
   .modal input[type=datetime-local],
   .modal input[type=date],
-  .modal input[type=time]{-webkit-appearance:none;appearance:none}
+  .modal input[type=time]{padding:0 16px;height:36px;line-height:normal;width:100%;width:-webkit-fill-available;max-width:100%;min-width:0}
 }
 /* 首页·今日课程卡片 */
 .cls-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
@@ -667,7 +691,7 @@ function def(){
     /* 抽签：drawn = 本轮已抽学生；drawTypes = 抽取类型（每种含自定义类别）；drawLogs = 抽取记录 */
     lottery:{drawn:[],allowRepeat:false,drawTypes:DEFAULT_DRAW_TYPES(),drawLogs:[]},
     redeem:DEFAULT_REDEEM(),
-    /* 班费支出：{id,date,item,amount,note} 按时间逆序记录，自动累计总额 */
+    /* 班费：{id,date,item,amount,note,kind} kind=out 支出 / in 收入；老记录无 kind 视为支出 */
     classFee:{logs:[]},
     /* 课表：cells 键 "周几-节次"（节次为数字 1..12；早自习=m，晚自习=e）
        times[p]={s,e} 每节次上课时间（含 m / e 早、晚自习）；早/晚自习行「有课时」才显示，位置在首/尾 */
@@ -995,7 +1019,7 @@ const SUB={
   grades:"按考试录入成绩并自动排名", todos:"班级日常事务与固定日期的工作安排，合并管理", behavior:"表扬、违纪、请假等记录",
   seating:"教室座位排布与轮换", tiers:"成绩+积分−身高 加权计算 A/B/C 等级",
   points:"个人与小组积分榜",   lottery:"随机抽人 + 自定义类型抽取",
-  fee:"记录班费支出，自动统计总额",
+  fee:"记录班费收入与支出，自动统计结余",
   schedule:"本周课程表",
   jobs:"科任老师 + 班级管理职务 + 历史任职",
   behtypes:"表扬、违纪等类别与默认分值，可导入导出复用",
@@ -4427,29 +4451,44 @@ function termDelApply(t){
   if(S.classFee&&Array.isArray(S.classFee.logs))S.classFee.logs=S.classFee.logs.filter(l=>!termDateIn(t,l.date));
 }
 /* ============ 班费支出 ============ */
+let feeKind="out";   /* 记一笔班费：out=支出（默认），in=收入 */
 function viewFee(v){
-  const logs=((S.classFee&&S.classFee.logs)||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-  const total=logs.reduce((s,l)=>s+(Number(l.amount)||0),0);
-  const list=logs.length?logs.map(l=>`
+  const all=((S.classFee&&S.classFee.logs)||[]);
+  /* 按日期倒序；同一天按录入先后倒序（后记的在上面） */
+  const logs=all.map((l,i)=>({l,i})).sort((a,b)=>{
+    const d=(b.l.date||"").localeCompare(a.l.date||"");
+    return d||(b.i-a.i);
+  }).map(x=>x.l);
+  const isIn=l=>l.kind==="in";
+  const income=logs.reduce((s,l)=>s+(isIn(l)?(Number(l.amount)||0):0),0);
+  const spend=logs.reduce((s,l)=>s+(isIn(l)?0:(Number(l.amount)||0)),0);
+  const bal=income-spend;
+  const list=logs.length?logs.map(l=>{
+    const amt=Number(l.amount)||0;
+    return `
     <div class="r-item" style="align-items:center">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${esc(l.item)}</div>
         <div class="tiny muted" style="margin-top:2px">${esc(l.date||"")}${l.note?` · ${esc(l.note)}`:""}</div>
       </div>
-      <span style="font-weight:700;color:var(--bad);white-space:nowrap;margin:0 6px">¥${(Number(l.amount)||0).toFixed(2)}</span>
+      <span class="chip ${isIn(l)?"ok":"bad"}" style="flex:none;font-weight:700;font-variant-numeric:tabular-nums">${isIn(l)?"+":"−"}¥${amt.toFixed(2)}</span>
       <span class="r-act"><button class="del" onclick="W.delFee('${l.id}')">删</button></span>
-    </div>`).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">💰</div>还没有班费支出记录</div>`;
+    </div>`;
+  }).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">💰</div>还没有班费收支记录</div>`;
   v.innerHTML=`
   <div class="card pad" style="margin-bottom:14px">
-    <div class="between row" style="margin-bottom:12px">
-      <span class="section-title" style="margin:0">记一笔班费支出</span>
-      <span class="tiny muted">共 ${logs.length} 笔 · 累计 <b style="color:var(--ink)">¥${total.toFixed(2)}</b></span>
+    <div class="between row wrap" style="margin-bottom:12px">
+      <span class="section-title" style="margin:0">记一笔</span>
+      <div class="tabs" id="feeSeg" style="margin:0">
+        <button class="${feeKind==="out"?"active":""}" data-k="out" onclick="W.setFeeKind('out')">支出</button>
+        <button class="${feeKind==="in"?"active":""}" data-k="in" onclick="W.setFeeKind('in')">收入</button>
+      </div>
     </div>
     <div class="field" style="margin-bottom:10px"><label class="lbl">日期</label>
       <input class="fld h30" type="date" id="feeDate" style="width:100%" value="${todayStr()}">
     </div>
-    <div class="field" style="margin-bottom:10px"><label class="lbl">支出项目</label>
-      <input class="fld h30" id="feeItem" style="width:100%" placeholder="如：购买卫生工具">
+    <div class="field" style="margin-bottom:10px"><label class="lbl">项目</label>
+      <input class="fld h30" id="feeItem" style="width:100%" placeholder="${feeKind==="in"?"如：收取班费":"如：购买卫生工具"}">
     </div>
     <div class="row" style="gap:8px;align-items:flex-end">
       <div class="field" style="flex:1;min-width:0;margin:0"><label class="lbl">金额（元）</label>
@@ -4462,27 +4501,38 @@ function viewFee(v){
     </div>
   </div>
   <div class="card pad">
-    <div class="between row" style="margin-bottom:8px">
-      <span class="section-title" style="margin:0">支出明细（${logs.length}）</span>
+    <div class="row wrap" style="gap:8px;align-items:center;margin-bottom:10px">
+      <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
+      <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
+      <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
+      <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
     </div>
     ${list}
   </div>`;
   const it=$("#feeItem");if(it)it.focus();
 }
+/* 支出 / 收入 切换：只改按钮态与输入提示，不整页重绘，避免正在填的内容被清空 */
+W.setFeeKind=k=>{
+  feeKind=k==="in"?"in":"out";
+  document.querySelectorAll("#feeSeg button").forEach(b=>b.classList.toggle("active",b.dataset.k===feeKind));
+  const p=document.getElementById("feeItem");
+  if(p)p.placeholder=feeKind==="in"?"如：收取班费":"如：购买卫生工具";
+};
 W.addFee=()=>{
   const date=($("#feeDate")&&$("#feeDate").value)||todayStr();
   const item=($("#feeItem")&&$("#feeItem").value||"").trim();
   const amtStr=($("#feeAmt")&&$("#feeAmt").value||"").trim();
   const note=($("#feeNote")&&$("#feeNote").value||"").trim();
-  if(!item){toast("请输入支出项目");return;}
+  if(!item){toast("请输入项目");return;}
   const amt=Number(amtStr);
   if(!amtStr||isNaN(amt)||amt<0){toast("请输入有效金额");return;}
   if(!S.classFee||!Array.isArray(S.classFee.logs))S.classFee={logs:[]};
-  S.classFee.logs.push({id:uid(),date,item,amount:amt,note});
-  save();route();toast("已记录班费支出");
+  const isIn=feeKind==="in";
+  S.classFee.logs.push({id:uid(),date,item,amount:amt,note,kind:feeKind});
+  save();route();toast(isIn?"已记录班费收入":"已记录班费支出");
 };
 W.delFee=id=>{
-  if(!confirm("删除这笔班费支出记录？"))return;
+  if(!confirm("删除这笔班费记录？"))return;
   if(!S.classFee||!Array.isArray(S.classFee.logs))return;
   S.classFee.logs=S.classFee.logs.filter(x=>x.id!==id);
   save();route();
@@ -4490,7 +4540,7 @@ W.delFee=id=>{
 W.delTerm=id=>{
   const t=el(id,S.terms||[]);if(!t)return;
   const p=termDelPlan(t);
-  const items=[["行为记录",p.beh],["积分日志",p.logs],["考试(含成绩)",p.exams],["事务",p.todos],["抽取记录",p.draw],["兑换/消除记录",p.rdm],["班费支出",p.fee]].filter(x=>x[1]>0);
+  const items=[["行为记录",p.beh],["积分日志",p.logs],["考试(含成绩)",p.exams],["事务",p.todos],["抽取记录",p.draw],["兑换/消除记录",p.rdm],["班费记录",p.fee]].filter(x=>x[1]>0);
   const detail=items.length?items.map(x=>x[0]+" "+x[1]+" 条").join("、"):"该时间范围内没有数据";
   if(!confirm(`删除学期「${t.name}」（${t.start||"—"} 至 ${t.end||"—"}）？\n范围内的数据将一起删除：${detail}。\n此操作不可恢复，确定删除？`))return;
   termDelApply(t);
