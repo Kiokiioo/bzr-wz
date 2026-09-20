@@ -126,12 +126,21 @@ input.fld[type=time],input.fld[type=date]{min-width:0}
 ::-webkit-datetime-edit-millisecond-field,
 ::-webkit-datetime-edit-meridiem-field,
 ::-webkit-datetime-edit-ampm-field{padding:0;margin:0}
-/* Safari 下日期/时间控件默认 inline-flex：旧版 iOS 会忽略 width:100% 而按内容宽度撑开，
-   于是顶破右边的内边距。这里用 width:100% + max-width:100% + min-width:0 三保险钉死：
-   认 100% 的版本按容器宽铺满，不认的版本也会被 max-width 卡住，绝不外溢。
+/* iOS 上日期/时间控件的宽度算法与普通输入框不同：它把 width 当**内容宽**，
+   再额外加上自己的 padding+border（8+8+1+1 = 18px），于是右端顶破卡片、吃掉右侧内边距
+   （真机截图实测：其余输入框右边界 1090，日期框 1145，正好多 18px）。
+   这里显式声明 box-sizing:border-box 先压一层；真正的兜底在 JS 的 fitTemporalWidths()
+   ——它渲染后实测，超出父容器才动手。
    注意：**不要**用 -webkit-fill-available —— iOS 上它按视口宽度解析，会直接把框撑出卡片。 */
-input.fld[type=date],input.fld[type=time],input.fld[type=datetime-local]{
-  width:100%;max-width:100%;min-width:0;text-align:left
+/* datetime-local / time 没有原生日历弹层，appearance:none 安全；加上 display:block 可让
+   box-sizing:border-box + width:100% 在 iOS 上真正生效（否则 iOS 会把 width 当内容盒算宽、再叠加自己的 padding+border，顶破右侧内边距）。
+   date 有原生日历弹层，appearance:none 在 iOS 上可能让选择器点不开，故不在此列，改由 JS 兜底 fitTemporalWidths 处理。 */
+input.fld[type=datetime-local],input.fld[type=time]{
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;text-align:left;
+  display:block;-webkit-appearance:none;appearance:none
+}
+input.fld[type=date]{
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;text-align:left;display:block
 }
 ::-webkit-date-and-time-value{text-align:left;margin:0}
 /* 行为类型下拉（选择框+输入框）：下拉列出全部已设类别，支持手输新类型 */
@@ -979,7 +988,7 @@ function computeTiers(){
 }
 function todayStr(){const d=new Date();return d.getFullYear()+"-"+(d.getMonth()+1).toString().padStart(2,"0")+"-"+d.getDate().toString().padStart(2,"0");}
 function ddLeft(date){if(!date)return 99;const a=new Date(todayStr());const b=new Date(date);return Math.round((b-a)/86400000);}
-function openModal(html){document.getElementById("modal").innerHTML=html;$("#mask").classList.add("show");}
+function openModal(html){document.getElementById("modal").innerHTML=html;$("#mask").classList.add("show");scheduleFitTemporal();setTimeout(fitTemporalWidths,120);}
 function closeModal(){$("#mask").classList.remove("show");$("#modal").innerHTML="";}
 function toast(msg){const t=document.createElement("div");t.textContent=msg;t.style.cssText="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;z-index:99;font-size:13px;box-shadow:var(--shadow-2)";document.body.appendChild(t);setTimeout(()=>t.remove(),1800);}
 function keepScroll(fn){
@@ -988,6 +997,33 @@ function keepScroll(fn){
   setTimeout(()=>window.scrollTo(0,top),0);
 }
 function refresh(){keepScroll(route);}
+
+/* ---- 日期/时间输入框宽度兜底（iOS Safari） ----
+   真机上 iOS 把 date/time/datetime-local 的 width 当内容宽算，还会再加一遍自己的
+   padding+border，右端就会顶出卡片。这里在每次渲染后实测：只要宽度超过父容器内容宽，
+   就折算成明确的 px 宽度钉住；再测一次，个别版本仍按内容盒算就再扣一遍溢出差。
+   只在真的溢出时才动手 —— 桌面端/Chrome 里宽度本来就是对的，完全不受影响。 */
+function fitTemporalWidths(){
+  const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
+  document.querySelectorAll("input[type=date],input[type=time],input[type=datetime-local]").forEach(el=>{
+    if(el.__wfit){el.style.width=el.__w0;el.__wfit=false;}     /* 先把上一轮钉的宽度还原，避免越修越窄 */
+    const p=el.parentElement;if(!p)return;
+    const pcs=getComputedStyle(p);
+    const avail=p.clientWidth-num(pcs.paddingLeft)-num(pcs.paddingRight);
+    if(!(avail>60))return;                                      /* 未渲染 / 不可见：跳过 */
+    if(el.getBoundingClientRect().width<=avail+1)return;        /* 没溢出：保持 CSS 原样 */
+    if(el.__w0===undefined)el.__w0=el.style.width;
+    el.style.width=Math.floor(avail)+"px";
+    const w=el.getBoundingClientRect().width;
+    if(w>avail+1)el.style.width=Math.max(60,Math.floor(avail-(w-avail)))+"px";
+    el.__wfit=true;
+  });
+}
+let _fitRaf=0;
+function scheduleFitTemporal(){if(_fitRaf)return;_fitRaf=requestAnimationFrame(()=>{_fitRaf=0;fitTemporalWidths();});}
+window.addEventListener("resize",scheduleFitTemporal);
+window.addEventListener("orientationchange",scheduleFitTemporal);
+new MutationObserver(scheduleFitTemporal).observe(document.documentElement,{childList:true,subtree:true});
 
 /* ============ router ============ */
 const routes={
@@ -1014,6 +1050,7 @@ function route(){
   }
   $("#moreDrawer").classList.remove("show");
   if(h!=="home") window.scrollTo(0,0);
+  setTimeout(fitTemporalWidths,120);  /* 页面渲染后延时实测，iOS 原生日期控件 layout 完成后再校正一次 */
 }
 const SUB={
   home:"今日待办、快捷操作与最近动态", memo:"随时记录要记住的事，可置顶并同步到首页", roster:"班级学生花名册，支持导入与搜索",
@@ -3315,6 +3352,7 @@ W.renderBehTime=()=>{
   }else{
     wrap.innerHTML=`<label class="lbl">时间</label><input class="fld" id="m_btime" type="datetime-local" value="${nowLocal()}">`;
   }
+  scheduleFitTemporal();setTimeout(fitTemporalWidths,120);  /* 异步注入的日期框，layout 稳定后再实测校正一次 */
 };
 
 W.addBehavior=(sid)=>{
