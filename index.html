@@ -126,6 +126,10 @@ input.fld[type=time],input.fld[type=date]{min-width:0}
 ::-webkit-datetime-edit-millisecond-field,
 ::-webkit-datetime-edit-meridiem-field,
 ::-webkit-datetime-edit-ampm-field{padding:0;margin:0}
+/* iOS Safari：datetime-edit 默认 inline-block 且不撑满输入框高度，导致文字偏上。
+   设为 inline-flex + align-items:center + 100% 高度，让日期/时间文字在输入框内垂直居中。 */
+::-webkit-datetime-edit{display:inline-flex;align-items:center;height:100%;line-height:1.2}
+::-webkit-datetime-edit-fields-wrapper{display:flex;align-items:center;height:100%}
 /* iOS 上日期/时间控件的宽度算法与普通输入框不同：它把 width 当**内容宽**，
    再额外加上自己的 padding+border（8+8+1+1 = 18px），于是右端顶破卡片、吃掉右侧内边距
    （真机截图实测：其余输入框右边界 1090，日期框 1145，正好多 18px）。
@@ -583,7 +587,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
      保留原生外观——加 -webkit-appearance:none 会让 iOS 上日期选择器点不开。 */
   .modal input[type=datetime-local],
   .modal input[type=date],
-  .modal input[type=time]{padding:0 16px;height:36px;line-height:normal;width:100%;max-width:100%;min-width:0}
+  .modal input[type=time]{padding:7px 16px;height:36px;line-height:normal;width:100%;max-width:100%;min-width:0}
 }
 /* 首页·今日课程卡片 */
 .cls-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
