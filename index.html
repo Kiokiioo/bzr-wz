@@ -21,7 +21,7 @@
   --bad:#d9506b; --bad-soft:#fbe7ec; --radius:14px; --radius-s:9px;
   --shadow:0 1px 2px rgba(20,30,60,.05),0 6px 18px rgba(20,30,60,.06);
   --shadow-2:0 2px 6px rgba(20,30,60,.08),0 12px 30px rgba(20,30,60,.10);
-  --sp:8px; --nav-w:240px;
+  --sp:8px; --nav-w:240px; --seat-min:90px;
 }
 html[data-theme="dark"]{
   --bg:#14161d; --panel:#1e2129; --panel-2:#262a34; --ink:#e8eaf0; --ink-2:#9aa3b6;
@@ -319,9 +319,9 @@ table.tbl.roster th.sortable{padding:9px 4px}
 /* seating */
 .seat-grid{display:grid;gap:8px;max-width:900px}
 .seat-scroll{min-width:0}
-.seat{aspect-ratio:1/1;min-height:48px;border:1.5px dashed var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--panel);font-size:12.5px;font-weight:600;color:var(--ink-2);user-select:none;position:relative}
-.seat .no{font-size:10px;color:var(--ink-2);font-weight:500}
-.seat .zn{position:absolute;top:3px;right:6px;font-size:9.5px;font-weight:800;line-height:1}
+.seat{aspect-ratio:1/1;min-height:var(--seat-min);border:1.5px dashed var(--line);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--panel);font-size:14px;font-weight:600;color:var(--ink-2);user-select:none;position:relative}
+.seat .no{font-size:12px;color:var(--ink-2);font-weight:500}
+.seat .zn{position:absolute;top:4px;right:8px;font-size:11px;font-weight:800;line-height:1}
 /* 等级分区色：与「学生等级」ABC 同色（A 绿 / B 琥珀 / C 红），便于视觉对应 */
 .seat.zone-A{border:1.5px solid var(--ok);background:var(--ok-soft)}
 .seat.zone-A .zn{color:var(--ok)}
@@ -331,9 +331,9 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .seat.zone-C .zn{color:var(--bad)}
 .seat.markable{cursor:crosshair}
 .seat.fixed{border-style:solid}
-.seat .fx{position:absolute;top:3px;left:6px;font-size:9.5px;font-weight:800;line-height:1;color:var(--bad)}
+.seat .fx{position:absolute;top:4px;left:8px;font-size:11px;font-weight:800;line-height:1;color:var(--bad)}
 /* 组长标识：大组长「大」/ 小组长「小」，落右下角（左上=固定、右上=等级分区） */
-.seat .ld{position:absolute;bottom:3px;right:5px;font-size:9px;font-weight:800;line-height:1;padding:1px 3px;border-radius:4px;
+.seat .ld{position:absolute;bottom:4px;right:6px;font-size:10px;font-weight:800;line-height:1;padding:1px 4px;border-radius:4px;
   background:color-mix(in srgb,var(--brand) 20%,var(--panel));color:var(--brand-ink)}
 .brush{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center;line-height:1}
 .brush:hover{border-color:var(--brand)}
@@ -357,7 +357,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .seat.filled:active{cursor:grabbing}
 .seat.dragover{border-color:var(--ok);background:var(--ok-soft)}
 /* 座位格内的「单个排位」按键：常驻半透明，聚焦/悬停/按下变实，避免遮挡姓名居中 */
-.seat-pick{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:9px;line-height:1;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--brand-ink);cursor:pointer;opacity:.55;transition:opacity .12s,border-color .12s,color .12s;z-index:2}
+.seat-pick{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--brand-ink);cursor:pointer;opacity:.55;transition:opacity .12s,border-color .12s,color .12s;z-index:2}
 .seat-pick:hover,.seat-pick:focus,.seat-pick:active{opacity:1;border-color:var(--brand);color:var(--brand);outline:none}
 /* 排位选择器里的学生条目 */
 .seat-opt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 10px;margin-bottom:4px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;font-size:13px;color:var(--ink)}
@@ -367,15 +367,14 @@ table.tbl.roster th.sortable{padding:9px 4px}
 /* 大组列分隔：每隔 bigGroup 列插入 1 根 8px 宽的虚线分隔条 */
 .seat-col-sep{background:repeating-linear-gradient(to bottom,var(--line) 0 4px,transparent 4px 8px);width:8px;justify-self:center;border-radius:1px}
 .seat-grid.grouped-cols{column-gap:6px}
-/* 大组标签（横排） */
-.group-label-row{display:grid;gap:8px;margin-bottom:6px;max-width:900px}
-.group-label-row .g-lbl{font-size:11.5px;color:var(--ink-2);text-align:center;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-.group-label-row .g-lbl.big{color:var(--brand-ink);border-bottom:1px dashed var(--line);padding-bottom:6px;margin-bottom:4px}
+/* 大组标签：移到左侧学习组轨道最下方 */
+.seat-grid .bg-lbl{display:flex;align-items:center;justify-content:center;min-height:36px;border-top:1px dashed var(--line);padding-top:6px;font-size:11.5px;font-weight:700;color:var(--brand-ink);letter-spacing:1px;background:var(--panel);border-radius:0 0 10px 10px}
+.seat-grid .bg-lbl .tiny{font-size:9px;font-weight:500}
 /* 学习组名侧栏：每个大组最左一条轨道，竖排显示「一A组」，纵向覆盖该学习组所有行 */
 /* 关键：writing-mode 只加在内层 .st-txt 上，容器保持横排。
    若把 vertical-rl 放在 .st-tag 上，grid 的「行」会沿 block 轴 = 水平方向铺开，组名与按钮变成左右并排。 */
-.st-tag{display:grid;grid-template-rows:auto auto;place-items:center;align-content:center;gap:6px;letter-spacing:2px;font-size:11.5px;font-weight:700;
-  color:var(--brand-ink);background:var(--panel-2);border-radius:8px;border:1px dashed var(--line);min-height:48px;position:relative;cursor:default}
+.st-tag{display:grid;grid-template-rows:auto auto;place-items:center;align-content:center;gap:6px;letter-spacing:2px;font-size:13px;font-weight:700;
+  color:var(--brand-ink);background:var(--panel-2);border-radius:8px;border:1px dashed var(--line);min-height:76px;position:relative;cursor:default}
 .st-txt{writing-mode:vertical-rl;letter-spacing:2px;justify-self:center;align-self:center}
 .st-tag.r0{color:var(--ink-2);font-weight:600;letter-spacing:1px}
 .st-tag.merged{color:var(--brand-ink);background:color-mix(in srgb,var(--brand) 12%,var(--panel-2));border-color:color-mix(in srgb,var(--brand) 35%,var(--line))}
@@ -505,6 +504,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 @media(max-width:767px){
   /* iOS 防自动放大：输入框字号必须 ≥16px，否则 Safari 会在聚焦瞬间把整页放大 */
   input,select,textarea,input.fld,select.fld,textarea.fld{font-size:16px}
+  :root{--seat-min:64px}
   .app{height:auto;min-height:100vh;overflow-x:hidden;flex-direction:column}
   .side{display:none}
   .main{height:auto;padding-bottom:64px;min-width:0}
@@ -546,18 +546,17 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .seat-cfg{flex-direction:column;align-items:flex-start;gap:10px}
   .seat-cfg>div{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;max-width:none}
   /* 手机端：座位图横向滚动，保证每格至少 52px 可读；
-     大组标签与座位通过 subgrid 共用父 grid 的列轨道，避免两独立 grid 因内容宽度不同而错位 */
-  .seat-scroll{display:grid;width:100%;max-width:100%;box-sizing:border-box;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;gap:6px}
-  .seat-scroll .group-label-row,
-  .seat-scroll .seat-grid{display:grid;grid-template-columns:subgrid;grid-column:1 / -1;min-width:0;max-width:none;margin-bottom:0;gap:6px}
-  .seat{min-width:52px;min-height:52px;font-size:11px}
-  .seat .no{font-size:9px}
-  .seat .zn{font-size:8px;top:2px;right:4px}
-  .seat .fx{font-size:8px;top:2px;left:4px}
-  .seat .ld{font-size:8px;bottom:2px;right:3px}
-  .seat-pick{font-size:8px;padding:1px 4px;min-width:auto;min-height:auto;opacity:.45}
+     学习组标签与座位通过 subgrid 共用父 grid 的列轨道，避免两独立 grid 因内容宽度不同而错位 */
+  .seat-scroll{display:grid;width:100%;max-width:100%;box-sizing:border-box;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px;gap:8px}
+  .seat-scroll .seat-grid{display:grid;grid-template-columns:subgrid;grid-column:1 / -1;min-width:0;max-width:none;margin-bottom:0;gap:8px}
+  .seat{min-width:var(--seat-min);min-height:var(--seat-min);font-size:12px}
+  .seat .no{font-size:10px}
+  .seat .zn{font-size:9px;top:3px;right:5px}
+  .seat .fx{font-size:9px;top:3px;left:5px}
+  .seat .ld{font-size:9px;bottom:3px;right:4px}
+  .seat-pick{font-size:9px;padding:1px 5px;min-width:auto;min-height:auto;opacity:.45}
   .seat-col-sep{width:6px}
-  .st-tag{min-height:52px;font-size:10px}
+  .st-tag{min-height:64px;font-size:11px}
   .tbl-scroll{max-height:none;-webkit-overflow-scrolling:touch}
   /* 手机端：敏感列改为图标，点击弹窗/拨号（桌面端仍为明文） */
   table.tbl.roster .cv-d{display:none}
@@ -2093,29 +2092,38 @@ function viewSeating(v){
      必须显式指定，否则座位 auto-placement 会跳过显式 sep 占用的轨道，导致
      "第 N 个座位" 不等于 "第 N 个轨道"，分隔条与座位错位（视觉 3-2-4 变成真 3-1-5）。 */
   const tagSide="left";/* 学习组名竖排标签固定显示在每大组最左（已移除左右切换按钮） */
-  const seatColTrack=new Array(cfg.cols+1); // 1-indexed
-  const sepTracks=[];
-  const sepTrackOf={};/* 大组末列座位轨道 → 其后的竖虚线轨道号 */
-  const sepGiOf={};/* 竖虚线轨道号 → 其左侧大组索引 gi（分隔 gi 与 gi+1） */
-  const tagTracks=[];/* 每个大组的「学习组名」轨道号 */
-  {let _acc=0;for(let gi=0;gi<bigGroups.length;gi++){
-    const base=1+_acc+2*gi,w=bigGroups[gi];
-    if(tagSide==="left"){
-      tagTracks.push(base);                                        /* 组名轨在本组列之前 */
-      for(let c=_acc+1;c<=_acc+w;c++) seatColTrack[c]=c+2*gi+1;
-    }else{
-      for(let c=_acc+1;c<=_acc+w;c++) seatColTrack[c]=c+2*gi;
-      tagTracks.push(base+w);                                      /* 组名轨在本组列之后 */
+  const nRows=cfg.rows+(cfg.row0?1:0);
+  /* 讲台视角：垂直镜像（第0排在最下、最后一排在最上）+ 水平镜像
+     （列号 9..1 从左到右，大组 三/二/一 从左到右）。 */
+  const rowTrack=idx=>2*(nRows-1-idx)+1;
+  const nBig=bigGroups.length;
+  const totalTracks=cfg.cols+nBig+(nBig-1);/* 列轨总数 = 座位 + 每组1条组名轨 + 大组间1条竖虚线轨 */
+  /* 直接按视觉顺序（左→右）计算每个座位列、学习组标签轨、大组间分隔轨。
+     视觉顺序 = 数据大组逆序（三大组→二大组→一大组），每组内部列号也逆序（9..1）。 */
+  const tagTracks=new Array(nBig);/* 每个数据大组 gi 的学习组标签轨道号 */
+  const seatColTrack=new Array(cfg.cols+1);/* 数据列 c 对应的座位轨道号 */
+  const sepTrackOf={};/* 大组末列座位轨道 → 其后竖虚线轨道号（视觉右侧） */
+  const sepGiOf={};/* 竖虚线轨道号 → 其视觉右侧大组索引 gi（merge 检查用 _sgi 与 _sgi+1） */
+  let track=1;
+  for(let i=0;i<nBig;i++){
+    const gi=nBig-1-i;/* 数据大组索引：视觉从左到右依次为 n-1, n-2, ..., 0 */
+    const w=bigGroups[gi];
+    const cumStart=bigGroups.slice(0,gi).reduce((a,b)=>a+b,0);
+    tagTracks[gi]=track;
+    track+=1;/* 跳过 40px 组名轨 */
+    for(let k=1;k<=w;k++){
+      const c=cumStart+k;/* 数据列 */
+      const visualK=w-k+1;/* 该列在视觉大组内的位置（从左数），逆序 */
+      seatColTrack[c]=track+visualK-1;
     }
-    _acc+=w;
-    if(gi<bigGroups.length-1){
-      const st=_acc+2*gi+2;
-      sepTracks.push(st);
-      /* 大组末列的座位轨道 → 其后那条竖虚线轨道（左侧/右侧模式偏移不同，不能简单用 trk+1） */
-      sepTrackOf[tagSide==="left"?_acc+2*gi+1:_acc+2*gi]=st;
-      sepGiOf[st]=gi;
+    track+=w;
+    if(i<nBig-1){
+      const lastC=cumStart+w;
+      sepTrackOf[seatColTrack[lastC]]=track;/* track 为分隔轨 */
+      sepGiOf[track]=gi-1;/* 视觉右侧大组 */
+      track+=1;
     }
-  }}
+  }
   const ZC={A:"var(--ok)",B:"var(--warn)",C:"var(--bad)",X:"var(--ink)",F:"var(--bad)"};
   /* 组长：cfg.leaders = {"gi:s":{big:学生id, small:学生id}}，键为「大组序号:学习组段号」，与组名解耦（改名/合并不影响）。
      仅作身份标记，不参与积分。大组长优先于小组长标识。 */
@@ -2134,13 +2142,12 @@ function viewSeating(v){
        座位与分隔条都显式指定 grid-column / grid-row，避免 auto-placement 跳过显式轨道导致错位（同大组列分隔修复思路）。
        第0排（row0）占原始行 idx=0：不产生学习组横向分隔，座位名 c-0。 */
     const studyGroup=Math.max(1,Math.min(cfg.rows,cfg.studyGroup|0||cfg.rows));
-    const nRows=cfg.rows+(cfg.row0?1:0);
-    /* 每个大组在网格中的 [sc, ec) 轨道范围（用于按大组分段渲染横向 sep） */
-    const _bigColsSpans=[];let _acc=0;for(let gi=0;gi<bigGroups.length;gi++){const sc=seatColTrack[_acc+1];const ec=seatColTrack[_acc+bigGroups[gi]]+1;_acc+=bigGroups[gi];_bigColsSpans.push({sc,ec});}
+    /* 每个大组在网格中的 [sc, ec) 轨道范围（用于按大组分段渲染横向 sep）。大组位置保持原样，用原始视觉轨道计算 */
+    const _bigColsSpans=[];for(let gi=0;gi<bigGroups.length;gi++){const w=bigGroups[gi];_bigColsSpans.push({sc:tagTracks[gi],ec:tagTracks[gi]+w+1});}
     let h="";
     for(let idx=0;idx<nRows;idx++){
       const r=(cfg.row0&&idx===0)?0:(cfg.row0?idx:idx+1); /* 显示行号：第0排→0，其余 1..rows */
-      const rtr=2*idx+1;
+      const rtr=rowTrack(idx); /* 讲台视角：物理行 idx 镜像，第0排(idx=0)在最下、最后一排在最上 */
       for(let c=1;c<=cfg.cols;c++){
         const i=idx*cfg.cols+(c-1);
         const sid=S.seating[i];const st=sid?el(sid,S.students):null;
@@ -2181,7 +2188,8 @@ function viewSeating(v){
         bigGroups.forEach((_,gi)=>{
           const a=_mgOf(gi,_k),b=_mgOf(gi,_k+1);
           if(a&&b&&a===b)return; /* 同一合并段内部 → 不隔开 */
-          h+=`<div class="seat-row-sep" style="grid-column:${_bigColsSpans[gi].sc} / ${_bigColsSpans[gi].ec};grid-row:${rtr+1}"></div>`;
+          /* 讲台视角：idx 越大越靠上，学习组边界在当前排上方 → rtr-1 */
+          h+=`<div class="seat-row-sep" style="grid-column:${_bigColsSpans[gi].sc} / ${_bigColsSpans[gi].ec};grid-row:${rowTrack(idx)-1}"></div>`;
         });
       }
     }
@@ -2192,16 +2200,10 @@ function viewSeating(v){
   const studyGroupCount=Math.ceil(cfg.rows/studyGroup);
   const colSepN=Math.max(0,bigGroups.length-1);
   const totalCols=cfg.cols+colSepN+bigGroups.length;/* 列 + 大组间竖虚线 + 每大组 1 条组名轨 */
-  /* 网格列模板：每个大组 = [40px 组名轨] + w 条座位轨，大组之间夹 1 条 8px 虚线轨 */
-  const gridTpl=bigGroups.map(w=>tagSide==="left"?`40px repeat(${w},minmax(52px,1fr))`:`repeat(${w},minmax(52px,1fr)) 40px`).join(" 8px ");
-  /* 大组标签横排：参照 seatColTrack 用显式 grid-column-start / end，让标签只覆盖所属座位轨道（不含分隔列），配合 .g-lbl 的 text-align:center 即可真正居中到所属列上方。 */
-  let _gacc=0;
-  const bigLabels=bigGroups.map((span,gi)=>{
-    const startCol=seatColTrack[_gacc+1];
-    const endCol=seatColTrack[_gacc+span]+1;
-    _gacc+=span;
-    return `<div class="g-lbl big" style="grid-column:${startCol} / ${endCol}">大组${toCNum(gi+1)}<span class="tiny muted" style="font-weight:500;margin-left:4px">${span}列</span></div>`;
-  }).join("");
+  /* 网格列模板：每个大组 = [40px 组名轨] + w 条座位轨，大组之间夹 1 条 8px 虚线轨。
+     讲台视角：大组顺序保持原样，仅座位数据列反序（seatColTrack），所以 gridTpl 不再 reverse。 */
+  const gridTplParts=bigGroups.map(w=>tagSide==="left"?`40px repeat(${w},minmax(var(--seat-min),1fr))`:`repeat(${w},minmax(var(--seat-min),1fr)) 40px`);
+  const gridTpl=gridTplParts.slice().reverse().join(" 8px ");
   /* 学习组名侧栏：在每大组最左那条轨道上按「学习组段」纵向渲染。
      数据：seatCfg.studyMerges = [{ id, tags:[组名, ...] }, ...] —— 合并段用组名集合描述，
      跨大组时同名段分属不同大组，按 (gi, sIdx) 各自显示。渲染时把当前大组内属于同一 merge 的
@@ -2217,10 +2219,16 @@ function viewSeating(v){
     /* 组名 → [gi, s] 反查表：拖动组名整体换座时，由组名定位区域 */
     const bandByName={};bigGroups.forEach((_,gi)=>{for(let s=0;s<segCnt;s++)bandByName[buildName(gi,s)]=[gi,s];});
     /* 合并段方案：整条 merge 只在「最左」参与的大组（最小 gi）渲染 1 个标签，其余大组该段留空 */
-    const mergePlans=studyMerges.filter(m=>Array.isArray(m.tags)&&m.tags.length>=2).map(m=>{
-      const bands=m.tags.map(t=>bandByName[t]).filter(Boolean);
-      return {m,bands,hostGi:bands.length?Math.min(...bands.map(b=>b[0])):-1};
-    });
+  const mergePlans=studyMerges.filter(m=>Array.isArray(m.tags)&&m.tags.length>=2).map(m=>{
+    const bands=m.tags.map(t=>bandByName[t]).filter(Boolean);
+    const hostGi=bands.length?bands.reduce((best,b)=>{
+      if(!best)return b;
+      const gi=b[0],bestGi=best[0];
+      if(bigGroups[gi]>bigGroups[bestGi] || (bigGroups[gi]===bigGroups[bestGi] && gi>bestGi))return b;
+      return best;
+    },null)[0]:-1;
+    return {m,bands,hostGi};
+  });
     /* 段显示名：合并段优先用自定义名 m.name；独立段可用 studyNames 自定义名；否则回落位置名 buildName(gi,s) */
     const studyNames=cfg.studyNames||{};
     const nameOfBand=(gi,s)=>{
@@ -2264,7 +2272,8 @@ function viewSeating(v){
           +`<button class="st-split" onclick="event.stopPropagation();W.unmergeByName('${esc(m.tags.join('|'))}')" title="拆回独立学习组">拆</button></span>`;
         const bandAttr=pl.bands.map(p=>p.join(":")).join(",");
         const hostB=pl.bands.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1])[0];
-        out+=`<div class="st-tag merged${sel}" ${dragAttrs(bandAttr)} style="grid-column:${tagTracks[gi]};grid-row:${2*idxStart+1} / ${2*idxEnd+2}" ${click} title="${esc(dispName)}${m.name?"（自定义）":""}${leaderTip(hostB?hostB[0]+":"+hostB[1]:"")}"><span class="st-txt">${esc(dispName)}</span>${btns}</div>`;
+        /* 讲台视角 rowTrack 反转：idxStart<idxEnd 时 rowTrack(idxStart)>rowTrack(idxEnd)，取反保证 start<end */
+        out+=`<div class="st-tag merged${sel}" ${dragAttrs(bandAttr)} style="grid-column:${tagTracks[gi]};grid-row:${rowTrack(idxEnd)} / ${rowTrack(idxStart)+1}" ${click} title="${esc(dispName)}${m.name?"（自定义）":""}${leaderTip(hostB?hostB[0]+":"+hostB[1]:"")}"><span class="st-txt">${esc(dispName)}</span>${btns}</div>`;
       });
       /* 独立段：属于任一 merge 的段不渲染（其标签已在最左大组统一显示） */
       bases.forEach(b=>{
@@ -2274,7 +2283,7 @@ function viewSeating(v){
         const sel=mergeMode && mergeSel.has(b.tagName)?' sel':'';
         const dispName=dispOf(b.tagName);
         const btns=`<span class="st-btns"><button class="st-split" onclick="event.stopPropagation();W.renameStudyGroup('${esc(b.tagName)}')" title="自定义这个学习组的组名">名</button></span>`;
-        out+=`<div class="st-tag${sel}" ${dragAttrs(gi+":"+b.s)} style="grid-column:${tagTracks[gi]};grid-row:${2*b.idxStart+1} / ${2*b.idxEnd+2}" ${click} title="${esc(dispName)} · ${b.idxEnd-b.idxStart+1}排${leaderTip(gi+":"+b.s)}"><span class="st-txt">${esc(dispName)}</span>${btns}</div>`;
+        out+=`<div class="st-tag${sel}" ${dragAttrs(gi+":"+b.s)} style="grid-column:${tagTracks[gi]};grid-row:${rowTrack(b.idxEnd)} / ${rowTrack(b.idxStart)+1}" ${click} title="${esc(dispName)} · ${b.idxEnd-b.idxStart+1}排${leaderTip(gi+":"+b.s)}"><span class="st-txt">${esc(dispName)}</span>${btns}</div>`;
       });
       /* 第0排标签：未并入时始终显示；合并模式下始终显示（含已并入态，便于点击切换归入） */
       if(row0&&(mergeMode||(cfg.row0Merge||{})[gi]===undefined||(cfg.row0Merge||{})[gi]<0)){
@@ -2282,8 +2291,11 @@ function viewSeating(v){
         const r0Txt=(typeof tgt==="number"&&tgt>=0)?("第0排·"+nameOfBand(gi,tgt)):"第0排";
         const click=mergeMode?`onclick="W.cycleRow0Merge(${gi})"`:'';
         const tip=mergeMode?"合模式下点击切换第0排归入：独立 → 一A组 → 一B组 → … → 独立":"第0排：未并入任何学习组";
-        out+=`<div class="st-tag r0${click?" clickable":""}" style="grid-column:${tagTracks[gi]};grid-row:1 / 2" ${click} title="${tip}"><span class="st-txt">${r0Txt}</span></div>`;
+        out+=`<div class="st-tag r0${click?" clickable":""}" style="grid-column:${tagTracks[gi]};grid-row:${rowTrack(0)} / ${rowTrack(0)+1}" ${click} title="${tip}"><span class="st-txt">${r0Txt}</span></div>`;
       }
+      /* 大组标签：移到左侧学习组轨道最下方，作为该大组底部标识 */
+      const _bgStart=rowTrack(0)+2;
+      out+=`<div class="bg-lbl" style="grid-column:${tagTracks[gi]} / ${tagTracks[gi]+bigGroups[gi]+1};grid-row:${_bgStart} / ${_bgStart+1}">大组${toCNum(gi+1)}<span class="tiny muted">${bigGroups[gi]}列</span></div>`;
     });
     return out;
   })();
@@ -2345,7 +2357,6 @@ function viewSeating(v){
       <button class="btn ghost sm h30" onclick="W.editLeaders()" title="设置每个学习组的大组长与小组长（仅标记身份，不影响积分）">组长</button>
     </div>
     <div class="seat-scroll" style="grid-template-columns:${gridTpl}">
-      <div class="group-label-row" style="grid-template-columns:${gridTpl}">${bigLabels}</div>
       <div class="seat-grid" id="seatGrid" style="grid-template-columns:${gridTpl}">${seatHtml()}${studyTags}</div>
     </div>
     ${!S.students.length?`<div class="tiny muted" style="margin-top:10px">提示：先在「学生名册」添加学生，才能安排座位。</div>`:""}
