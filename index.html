@@ -4863,7 +4863,10 @@ function applyTierText(txt){
   return {done,miss};
 }
 W.dragStart=(e,i)=>{e.dataTransfer.setData("text",i);};
-W.dropSeat=(e,i)=>{ensureSeat();const raw=e.dataTransfer.getData("text");if(String(raw).startsWith("SG:"))return;/* 组名拖拽落到座位上：忽略 */const from=+raw;if(Number.isNaN(from))return;if(S.seatFixed[i]){toast("目标座位已固定");return;}if(S.seatFixed[from]){toast("该学生座位已固定");return;}const t=S.seating[i];S.seating[i]=S.seating[from];S.seating[from]=t;W.syncStudyGroups();save();viewSeating(document.getElementById("view"));};
+W.dropSeat=(e,i)=>{ensureSeat();const raw=e.dataTransfer.getData("text");if(String(raw).startsWith("SG:"))return;/* 组名拖拽落到座位上：忽略 */const from=+raw;if(Number.isNaN(from))return;if(S.seatFixed[i]){toast("目标座位已固定");return;}if(S.seatFixed[from]){toast("该学生座位已固定");return;}const t=S.seating[i];S.seating[i]=S.seating[from];S.seating[from]=t;
+/* 等级（A/B/C 涂区域）随学生一起移动：交换两座位的等级标记 */
+const z=S.seatZones[i];S.seatZones[i]=S.seatZones[from];S.seatZones[from]=z;
+W.syncStudyGroups();save();viewSeating(document.getElementById("view"));};
 /* ============ 拖动学习组名整体换座 ============ */
 /* 拖起组名：携带该学习组（或合并段）的全部 (gi:s) 段；座位拖拽用 "text"=纯数字，组名用 "text"="SG:gi:s,..." 区分 */
 W.tagDragStart=(e,bands)=>{e.dataTransfer.setData("text","SG:"+bands);e.dataTransfer.effectAllowed="move";if(e.target&&e.target.classList)e.target.classList.add("dragging");};
@@ -4903,6 +4906,10 @@ W.swapStudyGroups=(srcBands,dstBands)=>{
   const comb=A.map(i=>S.seating[i]).concat(B.map(i=>S.seating[i]));
   B.forEach((si,k)=>S.seating[si]=comb[k]);           /* 目标区 ← 源区成员 */
   A.forEach((si,k)=>S.seating[si]=comb[B.length+k]);  /* 源区 ← 目标区成员（不等长时循环错位） */
+  /* 等级（A/B/C 涂区域）随学生一起移动：同步交换两区的等级标记 */
+  const combZ=A.map(i=>S.seatZones[i]).concat(B.map(i=>S.seatZones[i]));
+  B.forEach((si,k)=>S.seatZones[si]=combZ[k]);
+  A.forEach((si,k)=>S.seatZones[si]=combZ[B.length+k]);
   W.syncStudyGroups();save();viewSeating(document.getElementById("view"));
 };
 W.autoSeat=mode=>{
@@ -4993,6 +5000,8 @@ W.assignSeat=(i,sid)=>{
       if(S.seatFixed[from]){toast("该学生座位已固定，无法移动");return;}
       const tmp=S.seating[i];
       S.seating[i]=sid;S.seating[from]=tmp;
+      /* 等级（A/B/C 涂区域）随学生一起移动：交换两座位的等级标记 */
+      const z=S.seatZones[i];S.seatZones[i]=S.seatZones[from];S.seatZones[from]=z;
     }else{
       S.seating[i]=sid;
     }
