@@ -501,7 +501,16 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .more-sheet a .ic{font-size:16px}
 .more-sheet .ttl{padding:8px 10px;color:var(--ink-2);font-size:12px;font-weight:700}
 
+.range-custom{display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex-basis:100%}
+.pt-range-sel{flex:1;min-width:120px}
+
 @media(max-width:767px){
+  /* 积分/行为页：自定义时间范围在手机上独占第二行；两个日期输入框等分宽度，避免各自折成多行 */
+  .range-custom{width:100%;margin-top:2px}
+  .range-custom input[type=date]{flex:1;min-width:0;max-width:none}
+  /* 积分页 tab 更紧凑；select 最小宽度放开，保证 个人/组/兑换积分/自定义 能在手机首行放下 */
+  .tabs button{padding:5px 8px;font-size:12px}
+  .pt-range-sel{min-width:0}
   /* iOS 防自动放大：输入框字号必须 ≥16px，否则 Safari 会在聚焦瞬间把整页放大 */
   input,select,textarea,input.fld,select.fld,textarea.fld{font-size:16px}
   :root{--seat-min:64px}
@@ -2015,7 +2024,7 @@ function viewBehavior(v){
   const bv=S.behView||(S.behView={mode:"week",custom:{s:"",e:""}});
   const _b=ptRangeBounds(bv);
   let list=S.behaviors.slice().sort((a,b)=>(b.time||"").localeCompare(a.time||""));
-  /* 时间范围：选项与积分页完全一致（最近一周 / 最近一月 / 已设学期 / 所有时间 / 自定义）；按学生筛选时忽略时间范围，显示该生全部记录 */
+  /* 时间范围：选项与积分页完全一致（最近一周 / 最近两周 / 最近一个月 / 已设学期 / 所有时间 / 自定义）；按学生筛选时忽略时间范围，显示该生全部记录 */
   if(behStu)list=list.filter(b=>b.studentId===behStu);
   else if(_b)list=list.filter(b=>{const ds=(b.time||"").slice(0,10);return ds&&ds>=_b.s&&ds<=_b.e;});
   if(behFilter)list=list.filter(b=>b.type===behFilter);
@@ -2023,12 +2032,12 @@ function viewBehavior(v){
   const bopt=(val,label)=>`<option value="${esc(val)}" ${bv.mode===val?"selected":""}>${esc(label)}</option>`;
   const bTermList=(S.terms||[]).filter(t=>t&&!t.archived);
   const behRangeSel=`<select class="fld h30" style="width:120px;flex:none" onchange="W.setBehRange(this.value)" title="时间范围">
-      ${bopt("week","最近一周")}${bopt("month","最近一月")}
+      ${bopt("week","最近一周")}${bopt("2w","最近两周")}${bopt("month","最近一个月")}
       ${bTermList.length?`<optgroup label="已设学期">${bTermList.map(t=>bopt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
       ${bopt("all","所有时间")}${bopt("custom","自定义…")}
     </select>`;
-  const behCustomBox=bv.mode==="custom"?`<span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).s||"")}" onchange="W.setBehCustom('s',this.value)">
-      <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).e||"")}" onchange="W.setBehCustom('e',this.value)">`:"";
+  const behCustomBox=bv.mode==="custom"?`<div class="range-custom"><span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).s||"")}" onchange="W.setBehCustom('s',this.value)">
+      <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((bv.custom||{}).e||"")}" onchange="W.setBehCustom('e',this.value)"></div>`:"";
   const allSel=!behFilter;
   const filters=`<button class="chip" style="${allSel?'box-shadow:0 0 0 1.5px var(--brand);font-weight:700':'opacity:.92'}" onclick="behFilter='';viewBehavior(document.getElementById('view'))">全部</button>`+
     types.map(t=>{
@@ -2438,7 +2447,7 @@ let ptTab="person";
 /* 积分兑换：当前筛选的分类，"all" = 全部分类 */
 let redeemCatFilter="all";
 /* 积分页时间范围：
-   week = 本周一 ~ 今天（按周，不是 7 天）；month = 本月 1 日 ~ 今天（按自然月，不是 30 天）；
+   week = 本周一 ~ 今天（按周，不是 7 天）；2w = 两周前的周一 ~ 今天；month = 本月 1 日 ~ 今天（按自然月，不是 30 天）；
    all  = 所有时间（不筛选，显示全部记录）；t:<id> = 指定未归档学期；custom = 自定义起止。
    返回 {s,e}（YYYY-MM-DD，含端点）；null = 不限（全部记录）。 */
 /* 传 pvOverride 可按别的时间范围状态计算（行为记录页用 S.behView）；不传则用积分页 S.pointView */
@@ -2449,6 +2458,11 @@ function ptRangeBounds(pvOverride){
   if(pv.mode==="week"){
     const d=new Date(t+"T00:00:00"),wd=(d.getDay()+6)%7;/* 0=周一 */
     const s=new Date(d);s.setDate(d.getDate()-wd);
+    return {s:fmt(s),e:t};
+  }
+  if(pv.mode==="2w"){
+    const d=new Date(t+"T00:00:00"),wd=(d.getDay()+6)%7;/* 0=周一 */
+    const s=new Date(d);s.setDate(d.getDate()-wd-14);/* 两周前的周一 ~ 今天 */
     return {s:fmt(s),e:t};
   }
   if(pv.mode==="month")return {s:t.slice(0,8)+"01",e:t};
@@ -2462,7 +2476,8 @@ function ptRangeBounds(pvOverride){
 }
 const ptModeName=m=>{
   if(m==="week")return "最近一周";
-  if(m==="month")return "最近一月";
+  if(m==="2w")return "最近两周";
+  if(m==="month")return "最近一个月";
   if(m==="all")return "所有时间";
   if(m==="custom")return "自定义";
   const tr=el(String(m).slice(2),S.terms||[]);
@@ -2554,22 +2569,22 @@ function viewPoints(v){
   const pv=S.pointView||(S.pointView={mode:"week",custom:{s:"",e:""}});
   const termList=(S.terms||[]).filter(t=>t&&!t.archived);
   const opt=(val,label)=>`<option value="${esc(val)}" ${pv.mode===val?"selected":""}>${esc(label)}</option>`;
-  const rangeSel=`<select class="fld h30" style="flex:1;min-width:120px" onchange="W.setPtRange(this.value)" title="统计范围">
-      ${opt("week","最近一周")}${opt("month","最近一月")}
+  const rangeSel=`<select class="fld h30 pt-range-sel" onchange="W.setPtRange(this.value)" title="统计范围">
+      ${opt("week","最近一周")}${opt("2w","最近两周")}${opt("month","最近一个月")}
       ${termList.length?`<optgroup label="已设学期">${termList.map(t=>opt("t:"+t.id,t.name)).join("")}</optgroup>`:""}
       ${opt("all","所有时间")}${opt("custom","自定义…")}
     </select>`;
-  const customBox=pv.mode==="custom"?`<span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).s||"")}" onchange="W.setPtCustom('s',this.value)">
-      <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).e||"")}" onchange="W.setPtCustom('e',this.value)">`:"";
+  const customBox=pv.mode==="custom"?`<div class="range-custom"><span class="tiny muted">从</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).s||"")}" onchange="W.setPtCustom('s',this.value)">
+      <span class="tiny muted">到</span><input class="fld h30" type="date" style="width:auto" value="${esc((pv.custom||{}).e||"")}" onchange="W.setPtCustom('e',this.value)"></div>`:"";
   const isRdm=ptTab==='redeem';
   v.innerHTML=`
-  <div class="row wrap" style="gap:8px;margin-bottom:12px">
+  <div class="row wrap" style="gap:8px;margin-bottom:12px;align-items:center">
     <div class="tabs" style="margin-bottom:0;flex:none">
       <button class="${ptTab==='person'?'active':''}" onclick="ptTab='person';viewPoints(document.getElementById('view'))">个人积分</button>
       <button class="${ptTab==='group'?'active':''}" onclick="ptTab='group';viewPoints(document.getElementById('view'))">组积分</button>
-      <button class="${isRdm?'active':''}" onclick="ptTab='redeem';viewPoints(document.getElementById('view'))">兑换</button>
+      <button class="${isRdm?'active':''}" onclick="ptTab='redeem';viewPoints(document.getElementById('view'))">兑换积分</button>
     </div>
-    ${isRdm?"":`<div class="row wrap" style="gap:6px;flex:1;min-width:0">${rangeSel}${customBox}</div>`}
+    ${isRdm?"":`${rangeSel}${customBox}`}
   </div>
   ${isRdm?"":`<div class="tiny muted" style="margin:-6px 0 12px">统计范围：${esc(ptRangeLabel())}</div>`}
   ${ptTab==='person'?`
