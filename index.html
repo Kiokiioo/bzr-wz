@@ -4541,7 +4541,7 @@ function viewFee(v){
         <div class="tiny muted" style="margin-top:2px">${esc(l.date||"")}${l.note?` · ${esc(l.note)}`:""}</div>
       </div>
       <span class="chip ${isIn(l)?"ok":"bad"}" style="flex:none;font-weight:700;font-variant-numeric:tabular-nums">${isIn(l)?"+":"−"}¥${amt.toFixed(2)}</span>
-      <span class="r-act"><button class="del" onclick="W.delFee('${l.id}')">删</button></span>
+      <span class="r-act"><button onclick="W.editFee('${l.id}')">编辑</button><button class="del" onclick="W.delFee('${l.id}')">删</button></span>
     </div>`;
   }).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">💰</div>还没有班费收支记录</div>`;
   v.innerHTML=`
@@ -4605,6 +4605,48 @@ W.delFee=id=>{
   if(!S.classFee||!Array.isArray(S.classFee.logs))return;
   S.classFee.logs=S.classFee.logs.filter(x=>x.id!==id);
   save();route();
+};
+/* 编辑一笔班费记录：弹出与「记一笔」等价的表单，预填原值，保存即原地更新 */
+W.editFee=id=>{
+  const log=el(id,(S.classFee&&S.classFee.logs)||[]);
+  if(!log)return;
+  const isIn=log.kind==="in";
+  W._feeEditKind=log.kind||"out";
+  const seg=(k,label)=>`<button class="${k===log.kind?'active':''}" data-k="${k}" onclick="W._feeEditKind=this.dataset.k;document.querySelectorAll('#feeEditSeg button').forEach(b=>b.classList.toggle('active',b.dataset.k==='${k}'))">${label}</button>`;
+  openModal(`<h3 style="margin:0 0 12px">编辑班费记录</h3>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">类型</label>
+      <div class="tabs" id="feeEditSeg" style="margin:0">${seg("out","支出")}${seg("in","收入")}</div>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">日期</label>
+      <input class="fld h30" type="date" id="feeEditDate" style="width:100%" value="${esc(log.date||"")}">
+    </div>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">项目</label>
+      <input class="fld h30" id="feeEditItem" style="width:100%" value="${esc(log.item||"")}" placeholder="如：购买卫生工具">
+    </div>
+    <div class="field" style="margin-bottom:10px"><label class="lbl">金额（元）</label>
+      <input class="fld h30" type="number" min="0" step="0.01" id="feeEditAmt" style="width:100%" value="${esc(String(log.amount!=null?log.amount:""))}" placeholder="0.00">
+    </div>
+    <div class="field" style="margin-bottom:14px"><label class="lbl">备注（可选）</label>
+      <input class="fld h30" id="feeEditNote" style="width:100%" value="${esc(log.note||"")}" placeholder="经手人 / 说明">
+    </div>
+    <div class="between row">
+      <button class="btn ghost sm" onclick="closeModal()">取消</button>
+      <button class="btn h30" onclick="W.saveFeeEdit('${log.id}')">保存</button>
+    </div>`);
+  const it=$("#feeEditItem");if(it)it.focus();
+};
+W.saveFeeEdit=id=>{
+  const log=el(id,(S.classFee&&S.classFee.logs)||[]);
+  if(!log)return;
+  const date=($("#feeEditDate")&&$("#feeEditDate").value)||"";
+  const item=($("#feeEditItem")&&$("#feeEditItem").value||"").trim();
+  const amtStr=($("#feeEditAmt")&&$("#feeEditAmt").value||"").trim();
+  const note=($("#feeEditNote")&&$("#feeEditNote").value||"").trim();
+  if(!item){toast("请输入项目");return;}
+  const amt=Number(amtStr);
+  if(!amtStr||isNaN(amt)||amt<0){toast("请输入有效金额");return;}
+  log.date=date;log.item=item;log.amount=amt;log.note=note;log.kind=W._feeEditKind||log.kind;
+  save();closeModal();route();toast("已保存修改");
 };
 W.delTerm=id=>{
   const t=el(id,S.terms||[]);if(!t)return;
