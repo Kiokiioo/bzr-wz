@@ -4597,7 +4597,7 @@ function viewFee(v){
   }).join(""):`<div class="empty" style="padding:20px 10px"><div class="big">💰</div>还没有班费收支记录</div>`;
   v.innerHTML=`
   <div class="card pad" style="margin-bottom:14px">
-    <div class="between row wrap" style="margin-bottom:12px">
+    <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;width:100%">
       <span class="section-title" style="margin:0">记一笔</span>
       <div class="tabs" id="feeSeg" style="margin:0">
         <button class="${feeKind==="out"?"active":""}" data-k="out" onclick="W.setFeeKind('out')">支出</button>
@@ -4621,14 +4621,14 @@ function viewFee(v){
     </div>
   </div>
   <div class="card pad">
-    <div class="between row wrap" style="gap:8px;align-items:center;margin-bottom:8px">
+    <div class="row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;width:100%">
       <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
-      <div class="row wrap" style="gap:6px;align-items:center;flex:none">
+      <div class="row" style="display:flex;gap:6px;align-items:center;flex:none;margin-left:auto">
         <button class="btn ghost sm h30" onclick="W.importFee()">导入</button>
         <button class="btn ghost sm h30" onclick="W.exportFee()">导出</button>
       </div>
     </div>
-    <div class="row wrap" style="gap:6px;align-items:center;margin-bottom:10px">
+    <div class="row" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
       <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
       <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
       <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
