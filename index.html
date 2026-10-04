@@ -1821,14 +1821,35 @@ function gradeStudyGroupHtml(ex){
   list.sort((a,b)=>a.name.localeCompare(b.name,"zh"));
   if(!list.length)return "";
   return `<div class="card pad" style="margin-top:12px">
-    <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">学习小组成绩</span><span class="tiny muted">${esc(ex.name)} · 各组总分与平均分</span></div>
-    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>学习组</th><th>人数</th><th>总分</th><th>平均分</th></tr></thead>
+    <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">学习小组成绩</span><span class="tiny muted">${esc(ex.name)} · 各组总分与平均分（点击查看每人成绩）</span></div>
+    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>学习组</th><th style="text-align:center">人数</th><th style="text-align:center">总分</th><th style="text-align:center">平均分</th></tr></thead>
     <tbody>${list.map(g=>{
       const n=g.members.length;
-      return `<tr><td class="c-g"><b>${esc(g.name)}</b></td><td class="mini">${n}</td><td><b>${g.total}</b></td><td>${g.avg}</td></tr>`;
+      return `<tr style="cursor:pointer" title="点击查看 ${esc(g.name)} 每人成绩" onclick="W.showStudyGroup('${ex.id}','${esc(g.name)}')"><td class="c-g"><b>${esc(g.name)}</b></td><td class="mini" style="text-align:center">${n}</td><td style="text-align:center"><b>${g.total}</b></td><td style="text-align:center">${g.avg}</td></tr>`;
     }).join("")}</tbody></table></div>
   </div>`;
 }
+/* ---- 点击学习组：弹窗显示该次考试该组每人成绩 ---- */
+W.showStudyGroup=(exId,gName)=>{
+  const ex=S.exams.find(e=>e.id===exId);
+  if(!ex)return;
+  const subs=ex.subjects||[];
+  const members=S.students.filter(s=>String(s.g||"").trim()===gName);
+  if(!members.length){toast("该组暂无学生");return;}
+  let gTotal=0;
+  const rows=members.map(s=>{
+    const sc=ex.scores[s.id]||{};
+    let t=0,c=0;
+    subs.forEach(sub=>{const v=sc[sub];if(v!==undefined&&v!==""){t+=+v;c++;}});
+    gTotal+=t;
+    const avg=c?Math.round((t/c)*10)/10:0;
+    return {name:s.name,scores:subs.map(sub=>{const v=sc[sub];return (v!==undefined&&v!=="")?v:"·";}),total:Math.round(t*10)/10,avg};
+  });
+  const gAvg=members.length?Math.round((gTotal/members.length)*10)/10:0;
+  const body=`<div class="tbl-scroll"><table class="tbl"><thead><tr><th>姓名</th>${subs.map(s=>`<th style="text-align:center">${esc(s)}</th>`).join("")}<th style="text-align:center">总分</th><th style="text-align:center">平均分</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td class="c-g"><b>${esc(r.name)}</b></td>${r.scores.map(v=>`<td class="mini" style="text-align:center">${v}</td>`).join("")}<td style="text-align:center"><b>${r.total}</b></td><td style="text-align:center;color:var(--bad);font-weight:800">${r.avg}</td></tr>`).join("")}</tbody></table></div>`;
+  openModal(`<div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">${esc(gName)} · ${esc(ex.name)}</span><span class="tiny" style="color:var(--bad);font-weight:800">本组平均分 ${gAvg}</span></div>${body}`);
+};
 /* ---- 分数段分布：当前考试各科分数段人数 ---- */
 function gradeDistHtml(ex){
   let maxV=0;
@@ -1843,8 +1864,8 @@ function gradeDistHtml(ex){
   const lbl=b=>b.lo===0?`≤${b.hi}`:`${b.lo}~${b.hi}`;
   return `<div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">分数段分布</span><span class="tiny muted">${esc(ex.name)} · 各科人数</span></div>
-    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>分数段</th>${ex.subjects.map(s=>`<th>${esc(s)}</th>`).join("")}</tr></thead>
-    <tbody>${bands.map(b=>`<tr><td class="c-no">${lbl(b)}</td>${ex.subjects.map(sub=>{const n=cnt(sub,b);return `<td class="mini"><span class="${n?"":"muted"}" style="${n?"font-weight:600":""}">${n||"·"}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>分数段</th>${ex.subjects.map(s=>`<th style="text-align:center">${esc(s)}</th>`).join("")}</tr></thead>
+    <tbody>${bands.map(b=>`<tr><td class="c-no">${lbl(b)}</td>${ex.subjects.map(sub=>{const n=cnt(sub,b);return `<td class="mini" style="text-align:center"><span class="${n?"":"muted"}" style="${n?"font-weight:600":""}">${n||"·"}</span></td>`;}).join("")}</tr>`).join("")}</tbody></table></div>
   </div>`;
 }
 /* ---- 成绩规则：读取 / 兜底 ---- */
@@ -4600,17 +4621,17 @@ function viewFee(v){
     </div>
   </div>
   <div class="card pad">
-    <div class="between row wrap" style="gap:8px;align-items:center;margin-bottom:10px">
-      <div class="row wrap" style="gap:6px;align-items:center">
-        <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
-        <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
-        <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
-        <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
-      </div>
+    <div class="between row wrap" style="gap:8px;align-items:center;margin-bottom:8px">
+      <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
       <div class="row wrap" style="gap:6px;align-items:center;flex:none">
         <button class="btn ghost sm h30" onclick="W.importFee()">导入</button>
         <button class="btn ghost sm h30" onclick="W.exportFee()">导出</button>
       </div>
+    </div>
+    <div class="row wrap" style="gap:6px;align-items:center;margin-bottom:10px">
+      <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
+      <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
+      <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
     </div>
     ${list}
   </div>`;
