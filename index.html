@@ -1594,6 +1594,11 @@ W.sortGrades=k=>{
   if(gSort&&gSort.k===k)gSort.dir=-gSort.dir;else gSort={k,dir:1};
   viewGrades(document.getElementById("view"));
 };
+let sgSort=null;/* 学习小组成绩排序：{k:"total"|"avg", dir:1升|-1降}；null=按组名默认序 */
+W.sortStudyGroup=k=>{
+  if(sgSort&&sgSort.k===k)sgSort.dir=-sgSort.dir;else sgSort={k,dir:1};
+  viewGrades(document.getElementById("view"));
+};
 function viewGrades(v){
   if(!S.exams.length){v.innerHTML=`<div class="card pad" style="text-align:center"><div class="empty"><div class="big">📊</div>还没有考试，先添加一场</div><button class="btn" onclick="W.newExam()" style="margin-top:10px">添加</button></div>`;return;}
   if(!gradeExam||!el(gradeExam,S.exams))gradeExam=latestExamId();/* 默认最近一次考试 */
@@ -1818,11 +1823,18 @@ function gradeStudyGroupHtml(ex){
     });
     return {name:k,members,total:Math.round(total*10)/10,avg:members.length?Math.round((total/members.length)*10)/10:0};
   });
-  list.sort((a,b)=>a.name.localeCompare(b.name,"zh"));
+  if(sgSort){
+    const dir=sgSort.dir,k=sgSort.k;
+    list.sort((a,b)=>(a[k]-b[k])*dir);
+  } else {
+    list.sort((a,b)=>a.name.localeCompare(b.name,"zh"));
+  }
   if(!list.length)return "";
+  const sgArrow=k=>sgSort&&sgSort.k===k?(sgSort.dir===1?" ▲":" ▼"):"";
+  const sgTh=k=>`<th style="text-align:center;cursor:pointer;user-select:none${sgSort&&sgSort.k===k?";color:var(--brand);font-weight:800":""}" data-k="${k}" onclick="W.sortStudyGroup(this.dataset.k)" title="点击切换 ${k==="total"?"总分":"平均分"} 排序">${k==="total"?"总分":"平均分"}${sgArrow(k)}</th>`;
   return `<div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">学习小组成绩</span><span class="tiny muted">${esc(ex.name)} · 各组总分与平均分（点击查看每人成绩）</span></div>
-    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>学习组</th><th style="text-align:center">人数</th><th style="text-align:center">总分</th><th style="text-align:center">平均分</th></tr></thead>
+    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>学习组</th><th style="text-align:center">人数</th>${sgTh("total")}${sgTh("avg")}</tr></thead>
     <tbody>${list.map(g=>{
       const n=g.members.length;
       return `<tr style="cursor:pointer" title="点击查看 ${esc(g.name)} 每人成绩" onclick="W.showStudyGroup('${ex.id}','${esc(g.name)}')"><td class="c-g"><b>${esc(g.name)}</b></td><td class="mini" style="text-align:center">${n}</td><td style="text-align:center"><b>${g.total}</b></td><td style="text-align:center">${g.avg}</td></tr>`;
