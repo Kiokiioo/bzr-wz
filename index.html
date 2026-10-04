@@ -1630,7 +1630,7 @@ function viewGrades(v){
   v.innerHTML=`
   <div class="between row wrap" style="margin-bottom:12px">
     <div class="row" style="gap:8px">
-      <select class="fld h30" style="width:auto" onchange="gradeExam=this.value;viewGrades(document.getElementById('view'))">${S.exams.map(e=>`<option value="${e.id}" ${e.id===gradeExam?"selected":""}>${esc(e.name)}</option>`).join("")}</select>
+      <select class="fld h30" style="width:auto" onchange="gradeExam=this.value;viewGrades(document.getElementById('view'))">${[...S.exams].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e=>`<option value="${e.id}" ${e.id===gradeExam?"selected":""}>${esc(e.name)}</option>`).join("")}</select>
       <span class="chip">${esc(ex.date||"")}</span>
     </div>
     <div class="row" style="gap:6px">
@@ -1667,6 +1667,7 @@ function viewGrades(v){
       }).join("")}</tbody></table>
     </div>
   </div>
+  ${gradeStudyGroupHtml(ex)}
   ${gradeDistHtml(ex)}
   <div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:6px">
@@ -1799,6 +1800,35 @@ W.trendPoint=(eid,sub)=>{
   if(trendMark&&trendMark.sub===sub&&trendMark.i===i)trendMark=null;else trendMark={sub,i};
   viewGrades(document.getElementById("view"));
 };
+/* ---- 学习小组成绩：按学生 s.g（学习组名）聚合本场考试总分与平均分 ---- */
+function gradeStudyGroupHtml(ex){
+  const map={};
+  S.students.forEach(s=>{
+    const g=String(s.g||"").trim();
+    if(!g)return;
+    (map[g]=map[g]||{name:g,members:[]}).members.push(s);
+  });
+  const subs=ex.subjects;
+  const list=Object.keys(map).map(k=>{
+    const members=map[k].members;
+    let total=0;
+    members.forEach(m=>{
+      const sc=ex.scores[m.id]||{};
+      subs.forEach(sub=>{const v=sc[sub];if(v!==undefined&&v!=="")total+=+v;});
+    });
+    return {name:k,members,total:Math.round(total*10)/10,avg:members.length?Math.round((total/members.length)*10)/10:0};
+  });
+  list.sort((a,b)=>a.name.localeCompare(b.name,"zh"));
+  if(!list.length)return "";
+  return `<div class="card pad" style="margin-top:12px">
+    <div class="between row wrap" style="margin-bottom:8px"><span class="section-title" style="margin:0">学习小组成绩</span><span class="tiny muted">${esc(ex.name)} · 各组总分与平均分</span></div>
+    <div class="tbl-scroll"><table class="tbl"><thead><tr><th>学习组</th><th>人数</th><th>总分</th><th>平均分</th></tr></thead>
+    <tbody>${list.map(g=>{
+      const n=g.members.length;
+      return `<tr><td class="c-g"><b>${esc(g.name)}</b></td><td class="mini">${n}</td><td><b>${g.total}</b></td><td>${g.avg}</td></tr>`;
+    }).join("")}</tbody></table></div>
+  </div>`;
+}
 /* ---- 分数段分布：当前考试各科分数段人数 ---- */
 function gradeDistHtml(ex){
   let maxV=0;
@@ -4570,11 +4600,17 @@ function viewFee(v){
     </div>
   </div>
   <div class="card pad">
-    <div class="row wrap" style="gap:8px;align-items:center;margin-bottom:10px">
-      <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
-      <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
-      <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
-      <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
+    <div class="between row wrap" style="gap:8px;align-items:center;margin-bottom:10px">
+      <div class="row wrap" style="gap:6px;align-items:center">
+        <span class="section-title" style="margin:0">收支明细（${logs.length}）</span>
+        <span class="chip ok">收入 <b style="margin-left:4px">¥${income.toFixed(2)}</b></span>
+        <span class="chip bad">支出 <b style="margin-left:4px">¥${spend.toFixed(2)}</b></span>
+        <span class="chip ${bal<0?"bad":"brand"}">结余 <b style="margin-left:4px">¥${bal.toFixed(2)}</b></span>
+      </div>
+      <div class="row wrap" style="gap:6px;align-items:center;flex:none">
+        <button class="btn ghost sm h30" onclick="W.importFee()">导入</button>
+        <button class="btn ghost sm h30" onclick="W.exportFee()">导出</button>
+      </div>
     </div>
     ${list}
   </div>`;
@@ -4648,6 +4684,65 @@ W.saveFeeEdit=id=>{
   log.date=date;log.item=item;log.amount=amt;log.note=note;log.kind=W._feeEditKind||log.kind;
   save();closeModal();route();toast("已保存修改");
 };
+/* 班费 CSV 文本：日期,类型,项目,金额,备注（类型写「支出/收入」，便于老师直接看） */
+function feeText(){
+  let t="日期,类型,项目,金额,备注\n";
+  ((S.classFee&&S.classFee.logs)||[]).slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).forEach(l=>{
+    t+=[csvCell(l.date||""),csvCell(l.kind==="in"?"收入":"支出"),csvCell(l.item||""),csvCell(String(Number(l.amount)||0)),csvCell(l.note||"")].join(",")+"\n";
+  });
+  return t;
+}
+W.exportFee=()=>{
+  openModal(`<h3>导出班费收支</h3>
+  <div class="tiny muted" style="margin-bottom:6px">格式：日期,类型,项目,金额,备注（每行一笔；类型写「支出 / 收入」，金额单位元；可复制或下载 CSV 后自行用 Excel 编辑再回导）</div>
+  <textarea class="fld" id="m_io" rows="12" style="font-family:monospace;font-size:12px;white-space:pre">${esc(feeText())}</textarea>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn ghost" onclick="W.downloadIO('班费收支')">下载 CSV</button><button class="btn" onclick="W.copyIO()">复制</button></div>`);
+};
+W.importFee=()=>{
+  openModal(`<h3>导入班费收支</h3>
+  <div class="tiny muted" style="margin-bottom:10px">CSV 表头支持：日期,类型,项目,金额,备注；也可省略表头按此顺序填写。类型写「支出/收入」或 out/in。重复导入默认「追加」，勾选下方可「覆盖」现有全部记录（不可恢复）。</div>
+  <label class="row" style="gap:8px;margin:6px 0 12px;cursor:pointer"><input type="checkbox" id="m_feeReplace" style="width:16px;height:16px"><span>覆盖现有全部班费记录（不勾则追加到现有记录之后）</span></label>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W._pickFeeFile()">选择文件</button></div>`);
+};
+W._pickFeeFile=()=>{
+  const replace=!!(document.getElementById("m_feeReplace")&&document.getElementById("m_feeReplace").checked);
+  closeModal();
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err){toast(err);return;}
+    const r=applyFeeText(text);
+    if(r.empty){toast("文件为空");return;}
+    if(!S.classFee||!Array.isArray(S.classFee.logs))S.classFee={logs:[]};
+    if(replace)S.classFee.logs=r.logs;
+    else S.classFee.logs=S.classFee.logs.concat(r.logs);
+    save();route();
+    toast(replace?("已覆盖 "+r.n+" 条记录"):("已追加 "+r.n+" 条记录"+(r.bad?"，跳过 "+r.bad+" 行":"")));
+  }));
+};
+/* 解析班费 CSV 文本；返回 {logs,n,bad,empty}（纯函数，仅构造记录，不写 S） */
+function applyFeeText(txt){
+  const lines=String(txt||"").replace(/^\ufeff/,"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return {logs:[],n:0,bad:0,empty:true};
+  const cells=l=>l.split(/[,，]/).map(x=>x.trim());
+  const HMAP={"日期":"date","类型":"kind","收支":"kind","项目":"item","事项":"item","金额":"amount","钱":"amount","备注":"note","说明":"note"};
+  const head=cells(lines[0]);
+  let map=null,start=0;
+  if(head.filter(h=>HMAP[h]).length>=2){map={};head.forEach((h,i)=>{if(HMAP[h]&&map[HMAP[h]]===undefined)map[HMAP[h]]=i;});start=1;}
+  const POS=["date","kind","item","amount","note"];
+  const get=(c,k)=>{let v;if(map)v=map[k]!==undefined?c[map[k]]:"";else{const i=POS.indexOf(k);v=i>=0?(c[i]||""):"";}return v;};
+  const logs=[];let bad=0;
+  for(let i=start;i<lines.length;i++){
+    const c=cells(lines[i]);
+    if(!c.length)continue;
+    const item=get(c,"item");
+    const amt=Number(get(c,"amount"));
+    if(!item||isNaN(amt)||amt<0){bad++;continue;}
+    let kind=get(c,"kind");
+    kind=/^(收入|in)/i.test(kind)?"in":"out";
+    const date=get(c,"date");
+    logs.push({id:uid(),date:date||todayStr(),item,amount:amt,note:get(c,"note"),kind});
+  }
+  return {logs,n:logs.length,bad,empty:logs.length===0&&bad>0};
+}
 W.delTerm=id=>{
   const t=el(id,S.terms||[]);if(!t)return;
   const p=termDelPlan(t);
