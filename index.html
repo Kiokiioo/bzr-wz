@@ -1611,10 +1611,22 @@ function viewGrades(v){
   const subPrev={};ex.subjects.forEach(sub=>subPrev[sub]=prevExamForSub(ex,sub));
   const prevNames=[...new Set(ex.subjects.map(sub=>{const p=subPrev[sub];return p?p.name:null;}).filter(Boolean))];
   /* 排序：按 gSort 对学生排序（空值沉底），默认保持名册顺序 */
+  /* 总分进退步对照：上一场同口径总分（按学生预存，避免行内重复计算） */
+  const prevSum={};
+  if(prev){S.students.forEach(s=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});prevSum[s.id]=n?t:null;});}
+  else S.students.forEach(s=>prevSum[s.id]=null);
   const valOf=(s,k)=>{
     if(k==="name")return s.name;
     const sc=ex.scores[s.id]||{};
     if(k==="sum"){let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});return n?sum:null;}
+    if(k==="d"||k.indexOf("d:")===0){/* 总分 / 单科 进退步：当前值 − 上一场值，缺一则沉底 */
+      if(k==="d"){let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});const cur=n?sum:null,old=prevSum[s.id];return (cur!==null&&old!==null)?cur-old:null;}
+      const sub=k.slice(2);const cur=(sc[sub]===undefined||sc[sub]==="")?null:+sc[sub];const pe=subPrev[sub];const pv=pe?((pe.scores[s.id]||{})[sub]):undefined;const old=(pv!==undefined&&pv!=="")?+pv:null;return (cur!==null&&old!==null)?cur-old:null;
+    }
+    if(k==="r"||k.indexOf("r:")===0){/* 总分 / 单科 排名：名次映射，无名次则沉底 */
+      if(k==="r"){const rr=ranks[s.id];return rr===undefined?null:rr;}
+      const sub=k.slice(2);const rr=(subjRanks[sub]||{})[s.id];return rr===undefined?null:rr;
+    }
     const v2=sc[k];return (v2===undefined||v2==="")?null:+v2;
   };
   const rows=[...S.students];
@@ -1651,7 +1663,7 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta">进退步</th><th class="mini g-mini g-rank">排名</th>${hasSR?'<th class="mini g-mini g-srank">校排名</th>':''}</tr></thead>
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th><th class="mini g-mini g-rank${thCls("r:"+s)}" data-k="r:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">排名${arrow("r:"+s)}</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d")}</th><th class="mini g-mini g-rank${thCls("r")}" data-k="r" onclick="W.sortGrades(this.dataset.k)">排名${arrow("r")}</th>${hasSR?'<th class="mini g-mini g-srank">校排名</th>':''}</tr></thead>
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const r=ranks[s.id];
