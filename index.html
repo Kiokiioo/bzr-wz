@@ -1698,7 +1698,7 @@ function viewGrades(v){
             +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`<b>${srnkSubj}</b>`:`<span class="muted">—</span>`}</td>`:"");
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
-        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
+        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total" style="cursor:pointer" title="查看历次总分" onclick="W.totalHist('${s.id}')"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
@@ -1802,6 +1802,28 @@ W.stuExamDetail=(sid)=>{
     </div>`;
   openModal(`<h3>${esc(st.name)} · ${esc(ex.name)}</h3>
   <div class="sh-wrap">${head}${rows}${totalRow}</div>
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
+/* 点某学生总分：弹窗列出他所有考试的总分 / 总分排名 / 总级班·校（与单科历次弹窗同布局） */
+W.totalHist=(sid)=>{
+  const st=el(sid,S.students);if(!st)return;
+  const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">排名</span><span class="sh-sr">班/校</span></div>`;
+  const rows=list.map(e=>{
+    const sc=e.scores[sid]||{};
+    let sum=0,n=0;e.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
+    const has=n>0;
+    const rk=has?gradeRanks(e)[sid]:null;
+    const sr=has?((e.schoolRank||{})[sid]||null):null;
+    return `<div class="sh-row">
+      <span class="sh-name"><b>${esc(e.name)}</b><span class="tiny muted">${esc(e.date||"")}</span></span>
+      <span class="sh-score">${has?`<b>${sum}</b>`:`<span class="muted">未录入</span>`}</span>
+      <span class="sh-rank${rk&&rk<=3?" top":""}">${rk?("第"+rk+"名"):`<span class="muted">—</span>`}</span>
+      <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
+    </div>`;
+  }).join("");
+  openModal(`<h3>${esc(st.name)} · 总分</h3>
+  ${rows?`<div class="sh-wrap">${head}${rows}</div>`:`<div class="empty">暂无总分数据</div>`}
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
 };
 /* 各科进退步的对比考试：上一场「有该科目」的考试（日期早于本场，逐科往前找） */
