@@ -821,7 +821,7 @@ function load(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d){const ba
   if(!Array.isArray(base.seatHistory))base.seatHistory=[];
   if(!Array.isArray(base.schedHistory))base.schedHistory=[];
   /* 清理旧错误导入：把「班排名/校排名/总排名」等误当科目混入考试，从 subjects 与 scores 里移除 */
-  const BAD_SUBS=new Set(["班排名","校排名","总排名","班内排名","全校排名"]);
+  const BAD_SUBS=new Set(["班排名","校排名","总排名","班内排名","全校排名","班级排名"]);
   if(Array.isArray(base.exams)) base.exams.forEach(ex=>{
     if(Array.isArray(ex.subjects)) ex.subjects=ex.subjects.filter(s=>!BAD_SUBS.has(s));
     if(ex.scores) Object.keys(ex.scores).forEach(sid=>{if(ex.scores[sid]) BAD_SUBS.forEach(b=>delete ex.scores[sid][b]);});
@@ -5868,9 +5868,9 @@ function applyGradeText(ex,text){
   const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(lines.length<2)return {ok:false,msg:"至少需要表头和一行数据"};
   const head=lines[0].split(/[,，]/).map(x=>x.trim());
-  const SKIP={"总分":1,"平均":1,"平均分":1,"排名":1,"名次":1,"班排名":1,"校排名":1,"总排名":1,"班内排名":1,"全校排名":1};
+  const SKIP={"总分":1,"平均":1,"平均分":1,"排名":1,"名次":1,"班排名":1,"班内排名":1,"总排名":1,"班级排名":1};
   /* 总校级排名：表头为「校排名/校名次/全校排名/学校排名」等（不含科目前缀） */
-  const isTotalSR=h=>/^(校|全校|学校).{0,2}(排名|名次)$/.test(h);
+  const isTotalSR=h=>/^(校|学校|全校).{0,2}(排名|名次)$/.test(h);
   /* 分科校排名：表头为「语文校排名/数学校名次/英语校排」等（科目名 + 校 + 排名类） */
   const subjSR=h=>{const m=h.match(/^(.+?)\s*校(排名|名次|排|名)$/);return m?m[1]:null;};
   if(!ex.schoolRank)ex.schoolRank={};
