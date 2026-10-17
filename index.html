@@ -1682,7 +1682,7 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th>${hasSR_Subj[s]?`<th class="mini g-mini g-srank">班/校</th>`:""}`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d")}</th>${hasSR?'<th class="mini g-mini g-srank">班/校</th>':''}</tr></thead>
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th>${hasSR_Subj[s]?`<th class="mini g-mini g-srank">班/校</th>`:""}`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)" title="总分进退步">进退步${arrow("d")}</th>${hasSR?'<th class="mini g-mini g-srank" title="总排名 = 班排名/校排名">总排名</th><th class="mini g-mini g-delta" title="校排名进退步：本次校排名 − 上次考试校排名（正=前进）">校进退步</th>':''}</tr></thead>
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const srnk=(ex.schoolRank||{})[s.id];
@@ -1698,7 +1698,10 @@ function viewGrades(v){
             +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`<b>${srnkSubj}</b>`:`<span class="muted">—</span>`}</td>`:"");
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
-        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total" style="cursor:pointer" title="查看历次总分" onclick="W.totalHist('${s.id}')"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
+        const _prevSR=prev&&prev.schoolRank&&prev.schoolRank[s.id]!==undefined?prev.schoolRank[s.id]:null;
+        let _srD='<span class="muted">—</span>';
+        if(srnk!==undefined&&srnk!==null&&_prevSR!==null){const _d=_prevSR-srnk;_srD=!_d?'<span class="muted">0</span>':`<b style="color:${_d>0?'var(--ok)':'var(--bad)'}">${_d>0?'+'+_d:_d}</b>`;}
+        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total" style="cursor:pointer" title="查看历次总分" onclick="W.totalHist('${s.id}')"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${ranks[s.id]!==undefined?ranks[s.id]:"—"}/${srnk!==undefined&&srnk!==null?srnk:"—"}</td>`:""}${hasSR?`<td class="mini g-delta">${_srD}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
