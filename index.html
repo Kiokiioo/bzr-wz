@@ -318,6 +318,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 /* 科目成绩历次弹窗：考试名称 / 成绩 / 排名（班内）/ 班·校 四列对齐 */
 .sh-wrap{border-top:none}
 .sh-row{display:grid;grid-template-columns:1fr 54px 64px 78px;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.sh-row.sh-3{grid-template-columns:1fr 54px 78px}/* 总分弹窗 3 列：考试-成绩-总排名 */
 .sh-row:last-child{border-bottom:none}
 .sh-row.sh-head{font-size:11px;color:var(--ink-2);font-weight:600;border-bottom:none;padding:6px 2px}
 .sh-name{min-width:0;display:flex;flex-direction:column;line-height:1.25}
@@ -1702,13 +1703,13 @@ function viewGrades(v){
             ?`<input class="fld" style="width:37px;padding:4px 2px;text-align:center" value="${sc[sub]!==undefined?esc(sc[sub]):""}" onchange="W.setScore('${ex.id}','${s.id}','${esc(sub)}',this.value)">`
             :(cur!==null?`<b style="cursor:pointer" title="查看历次${esc(sub)}成绩" onclick="W.subHist('${s.id}','${esc(sub)}')">${cur}</b>`:`<span class="muted" style="cursor:pointer" onclick="W.subHist('${s.id}','${esc(sub)}')">—</span>`)}</td>`
             +deltaCell(cur,old)
-            +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`<b>${srnkSubj}</b>`:`<span class="muted">—</span>`}</td>`:"");
+            +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`${srnkSubj}`:`<span class="muted">—</span>`}</td>`:"");
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
         const _prevSR=prev&&prev.schoolRank&&prev.schoolRank[s.id]!==undefined?prev.schoolRank[s.id]:null;
         let _srD='<span class="muted">—</span>';
         if(srnk!==undefined&&srnk!==null&&_prevSR!==null){const _d=_prevSR-srnk;_srD=!_d?'<span class="muted">0</span>':`<b style="color:${_d>0?'var(--ok)':'var(--bad)'}">${_d>0?'+'+_d:_d}</b>`;}
-        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total" style="cursor:pointer" title="查看历次总分" onclick="W.totalHist('${s.id}')"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${ranks[s.id]!==undefined?ranks[s.id]:"—"}/${srnk!==undefined&&srnk!==null?srnk:"—"}</td>`:""}${hasSR?`<td class="mini g-delta">${_srD}</td>`:""}</tr>`;
+        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total" style="cursor:pointer" title="查看历次总分" onclick="W.totalHist('${s.id}')"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank"><b>${ranks[s.id]!==undefined?ranks[s.id]:"—"}/${srnk!==undefined&&srnk!==null?srnk:"—"}</b></td>`:""}${hasSR?`<td class="mini g-delta">${_srD}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
@@ -1727,7 +1728,7 @@ function viewGrades(v){
       return `<div class="r-item" style="padding:7px 0">
       <div style="flex:1;min-width:0"><b>${esc(e.name)}</b><div class="tiny muted">${esc(e.date||"")} · ${e.subjects.length} 科 · ${n} 人${e.note?" · "+esc(e.note):""}</div></div>
       <span class="r-act">
-        <button onclick="W.editGAdd('${e.id}')" title="修改名称/备注，或重新导入文件">修改</button>
+        <button onclick="W.editGAdd('${e.id}')" title="修改名称/时间，或重新导入文件">修改</button>
         <button class="del" onclick="W.delGAdd('${e.id}')" title="删除这场考试及成绩">删</button>
       </span></div>`;}).join("")}
   </div>`;
@@ -1755,16 +1756,19 @@ function latestExamId(){
 W.subHist=(sid,sub)=>{
   const st=el(sid,S.students);if(!st)return;
   const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).filter(e=>e.subjects.includes(sub));
-  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">排名</span><span class="sh-sr">班/校</span></div>`;
-  const rows=list.map(e=>{
+  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">进退步</span><span class="sh-sr">班/校</span></div>`;
+  const rows=list.map((e,i)=>{
     const v=(e.scores[sid]||{})[sub];
     const has=v!==undefined&&v!=="";
-    const rk=has?subjRankMap(e,sub)[sid]:null;
+    const prev=i>0?list[i-1]:null;
+    const oldV=prev?((prev.scores[sid]||{})[sub]):undefined;
+    const oldHas=oldV!==undefined&&oldV!=="";
+    const d=has&&oldHas?(+v-+oldV):null;
     const sr=has?((e.schoolRankBySubj&&e.schoolRankBySubj[sub]&&e.schoolRankBySubj[sub][sid])||null):null;
     return `<div class="sh-row">
       <span class="sh-name"><b>${esc(e.name)}</b><span class="tiny muted">${esc(e.date||"")}</span></span>
       <span class="sh-score">${has?`<b>${esc(v)}</b>`:`<span class="muted">未录入</span>`}</span>
-      <span class="sh-rank${rk&&rk<=3?" top":""}">${rk?("第"+rk+"名"):`<span class="muted">—</span>`}</span>
+      <span class="sh-rank">${d!==null?!d?'<span class="muted">0</span>':`<b style="color:${d>0?'var(--ok)':'var(--bad)'}">${d>0?'+'+d:d}</b>`:`<span class="muted">—</span>`}</span>
       <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
     </div>`;
   }).join("");
@@ -1818,17 +1822,15 @@ W.stuExamDetail=(sid)=>{
 W.totalHist=(sid)=>{
   const st=el(sid,S.students);if(!st)return;
   const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">排名</span><span class="sh-sr">班/校</span></div>`;
+  const head=`<div class="sh-row sh-head sh-3"><span>考试</span><span class="sh-score">成绩</span><span class="sh-sr">总排名</span></div>`;
   const rows=list.map(e=>{
     const sc=e.scores[sid]||{};
     let sum=0,n=0;e.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
     const has=n>0;
-    const rk=has?gradeRanks(e)[sid]:null;
     const sr=has?((e.schoolRank||{})[sid]||null):null;
-    return `<div class="sh-row">
+    return `<div class="sh-row sh-3">
       <span class="sh-name"><b>${esc(e.name)}</b><span class="tiny muted">${esc(e.date||"")}</span></span>
       <span class="sh-score">${has?`<b>${sum}</b>`:`<span class="muted">未录入</span>`}</span>
-      <span class="sh-rank${rk&&rk<=3?" top":""}">${rk?("第"+rk+"名"):`<span class="muted">—</span>`}</span>
       <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
     </div>`;
   }).join("");
@@ -1869,13 +1871,16 @@ function gradeTrendHtml(){
   let maxV=0;series.forEach(se=>se.pts.forEach(v=>{if(v!==null&&v>maxV)maxV=v;}));
   if(!maxV)return "";
   const top=Math.max(100,Math.ceil(maxV/10)*10);
-  const W2=560,H=210,L=30,R=8,T=10,B=22,iw=W2-L-R,ih=H-T-B;
-  const X=i=>exams.length===1?L+iw/2:L+iw*i/(exams.length-1);
+  const EW=96;/* 每个考试固定横向宽度(px)：不再随考试数均分整个图宽，考试多了整体变宽、横向滚动；96 给完整考试名留空间 */
+  const H=210,L=30,R=8,T=10,B=22;
+  const W2=L+R+Math.max(1,exams.length)*EW;
+  const iw=W2-L-R,ih=H-T-B;
+  const X=i=>L+EW*i;
   const Y=v=>T+ih*(1-v/top);
   let g="";
   for(let k=0;k<=4;k++){const v=Math.round(top*k/4),yy=+Y(v).toFixed(1);
     g+=`<line x1="${L}" y1="${yy}" x2="${W2-R}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${L-4}" y="${yy+3}" text-anchor="end" font-size="9" fill="var(--ink-2)">${v}</text>`;}
-  exams.forEach((e,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(e.name.length>4?e.name.slice(0,4):e.name)}</text>`;});
+  exams.forEach((e,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(e.name)}</text>`;});
   let paths="",dots="";
   series.forEach(se=>{
     const c=colOf[se.sub];
@@ -1900,7 +1905,7 @@ function gradeTrendHtml(){
   return `<div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:6px"><span class="section-title" style="margin:0">成绩曲线</span><span class="tiny muted">${trendSub?"只看："+esc(trendSub):"各科每次考试 · 班级平均分"}</span></div>
     <div class="row wrap" style="gap:10px;margin-bottom:4px">${legend}</div>
-    <svg viewBox="0 0 ${W2} ${H}" style="width:100%;height:auto;display:block">${g}${paths}${dots}</svg>
+    <div style="overflow-x:auto"><svg viewBox="0 0 ${W2} ${H}" style="width:${W2}px;min-width:100%;height:auto;display:block">${g}${paths}${dots}</svg></div>
   </div>`;
 }
 /* 图例点选：聚焦单科 / 再点恢复全部 */
@@ -3497,7 +3502,7 @@ W.exportGrades=id=>{const ex=el(id,S.exams);
 W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
   openModal(`<h3>修改考试</h3>
     <div class="field"><label class="lbl">考试名称</label><input class="fld" id="m_gn" value="${esc(ex.name)}"></div>
-    <div class="field"><label class="lbl">备注</label><input class="fld" id="m_gx" value="${esc(ex.note||"")}" placeholder="如：成绩已录入"></div>
+    <div class="field"><label class="lbl">日期</label><input class="fld" type="date" id="m_gd" value="${esc(ex.date||"")}"></div>
     <div class="tiny muted" style="margin:2px 0 4px">「重新导入文件」会按文件表头覆盖本场成绩、分科班/校与总级校排名（科目表头以文件为准）。</div>
     <div class="foot">
       <button class="btn ghost" onclick="closeModal()">取消</button>
@@ -3506,9 +3511,9 @@ W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
     </div>`);};
 W.reimportExam=id=>{
   const ex=el(id,S.exams);if(!ex)return;
-  const gn=$("#m_gn"),gx=$("#m_gx");
+  const gn=$("#m_gn"),gd=$("#m_gd");
   if(gn&&gn.value.trim())ex.name=gn.value.trim();
-  if(gx)ex.note=(gx.value||"").trim();
+  if(gd)ex.date=gd.value.trim();
   pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
     if(err||!text){toast("读取失败："+err);return;}
     const r=applyGradeText(ex,text);
@@ -3518,9 +3523,9 @@ W.reimportExam=id=>{
   }));
 };
 W.saveGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
-  const gn=$("#m_gn");
+  const gn=$("#m_gn"),gd=$("#m_gd");
   if(gn&&gn.value.trim())ex.name=gn.value.trim();
-  ex.note=($("#m_gx").value||"").trim();
+  ex.date=gd?gd.value.trim():ex.date;
   save();closeModal();viewGrades(document.getElementById("view"));toast("已保存");};
 W.delGAdd=id=>{
   const ex=el(id,S.exams);if(!ex)return;
