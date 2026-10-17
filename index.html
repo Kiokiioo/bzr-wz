@@ -3377,14 +3377,17 @@ W.editExam=id=>{const ex=el(id,S.exams);openModal(`<h3>编辑考试</h3>
 W.doEditExam=id=>{const ex=el(id,S.exams);ex.name=$("#m_en").value.trim();ex.date=$("#m_ed").value;ex.subjects=$("#m_es").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);save();closeModal();refresh();};
 W.setScore=(eid,sid,sub,val)=>{const ex=el(eid,S.exams);if(!ex.scores[sid])ex.scores[sid]={};ex.scores[sid][sub]=val===""?undefined:val;const cnt=applyGradeRules(ex);save();setTimeout(()=>{if(gradeExam===eid)viewGrades(document.getElementById("view"));},0);if(cnt)toast("已按成绩记分 "+cnt+" 条");};
 W.exportGrades=id=>{const ex=el(id,S.exams);
-  const srnkCols=ex.subjects.filter(sub=>(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub]&&Object.keys(ex.schoolRankBySubj[sub]).length));
-  let csv="姓名,"+ex.subjects.join(",")+(srnkCols.length?","+srnkCols.map(s=>s+"校排名").join(","):"")+",总分,平均,排名,校排名\n";
+  const hasSubjSR=sub=>!!(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub]&&Object.keys(ex.schoolRankBySubj[sub]).length);
+  const hasTotalSR=!!(ex.schoolRank&&Object.keys(ex.schoolRank).length);
+  let csv="姓名";
+  ex.subjects.forEach(sub=>{csv+=","+sub;if(hasSubjSR(sub))csv+=",班/校";}); /* 与用户导入格式一致：科目后紧跟班/校 */
+  csv+=",总分"+(hasTotalSR?",班/校":"")+",平均,排名\n";
   const ranks=gradeRanks(ex);
   S.students.forEach(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
     const srnk=ex.schoolRank&&ex.schoolRank[s.id];
-    csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")
-      +(srnkCols.length?","+srnkCols.map(sub=>(ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][s.id])||"").join(","):"")
-      +`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""},${srnk||""}\n`;});
+    csv+=s.name;
+    ex.subjects.forEach(sub=>{csv+=","+(sc[sub]!==undefined?sc[sub]:"");if(hasSubjSR(sub))csv+=","+((ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][s.id])||"");});
+    csv+=","+(n?sum:"")+(hasTotalSR?","+(srnk||""):"")+","+(n?Math.round(sum/n):"")+","+(ranks[s.id]||"")+"\n";});
   downloadCSV(ex.name,csv);};
 /* 考试记录：改备注 / 删除考试（连同成绩，撤销成绩规则自动记分） */
 W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
@@ -5755,7 +5758,7 @@ W.exportRoster=()=>{
 /* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数）。
    表头按列名定位（兼容列顺序变化与中间空列）；「总分/平均/排名」等汇总列自动跳过，
    使本应用导出的成绩 CSV 可直接回导而不产生假科目；「校排名」列存入 ex.schoolRank（总校级），
-   「语文校排名」等分科校排名列存入 ex.schoolRankBySubj[科目]。 */
+   「语文校排名」等分科校排名列、以及紧跟科目后的「班/校」列（值如 2/90），存入 ex.schoolRankBySubj[科目]。 */
 function applyGradeText(ex,text){
   if(!ex)return {ok:false,msg:"考试不存在"};
   const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -5769,12 +5772,22 @@ function applyGradeText(ex,text){
   if(!ex.schoolRank)ex.schoolRank={};
   if(!ex.schoolRankBySubj)ex.schoolRankBySubj={};
   const cols=[];let srCol=-1;const subjSRCols=[];
+  let prevHeader=null;
   head.forEach((h,i)=>{
-    if(i===0||!h||SKIP[h])return;
-    if(isTotalSR(h)){if(srCol<0)srCol=i;return;}
+    if(i===0||!h){prevHeader=h;return;}
+    if(SKIP[h]){prevHeader=h;return;}
+    if(isTotalSR(h)){if(srCol<0)srCol=i;prevHeader=h;return;}
     const ss=subjSR(h);
-    if(ss){if(!ex.schoolRankBySubj[ss])ex.schoolRankBySubj[ss]={};subjSRCols.push([ss,i]);return;}
+    if(ss){if(!ex.schoolRankBySubj[ss])ex.schoolRankBySubj[ss]={};subjSRCols.push([ss,i]);prevHeader=h;return;}
+    /* 紧跟在科目后的「班/校」列：值为「班排/校排」合并文本，归到前一科目；紧跟「总分」后的为总校级 */
+    if(h==="班/校" && prevHeader && i>1 && prevHeader!=="班/校" && (prevHeader==="总分" || (!SKIP[prevHeader] && !isTotalSR(prevHeader) && !subjSR(prevHeader)))){
+      if(prevHeader==="总分"){if(srCol<0)srCol=i;}
+      else{if(!ex.schoolRankBySubj[prevHeader])ex.schoolRankBySubj[prevHeader]={};subjSRCols.push([prevHeader,i]);}
+      prevHeader=h;
+      return;
+    }
     cols.push([h,i]);
+    prevHeader=h;
   });
   if(!cols.length)return {ok:false,msg:"表头缺少科目"};
   cols.forEach(([s])=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
