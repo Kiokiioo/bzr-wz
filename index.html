@@ -1605,6 +1605,7 @@ function viewGrades(v){
   const ex=el(gradeExam,S.exams);
   const ranks=gradeRanks(ex);
   const hasSR=!!(ex.schoolRank&&Object.keys(ex.schoolRank).length);
+  const hasSR_Subj={};ex.subjects.forEach(sub=>{const m=(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub])||{};hasSR_Subj[sub]=!!Object.keys(m).length;});
   const prev=prevExam(ex);/* 总分进退步仍对比紧邻上一场 */
   const subjRanks={};ex.subjects.forEach(sub=>subjRanks[sub]=subjRankMap(ex,sub));
   /* 各科进退步：对比上一场「有该科目」的考试 */
@@ -1663,24 +1664,23 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th><th class="mini g-mini g-rank${thCls("r:"+s)}" data-k="r:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">排名${arrow("r:"+s)}</th>`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d")}</th><th class="mini g-mini g-rank${thCls("r")}" data-k="r" onclick="W.sortGrades(this.dataset.k)">排名${arrow("r")}</th>${hasSR?'<th class="mini g-mini g-srank">校排名</th>':''}</tr></thead>
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th>${hasSR_Subj[s]?`<th class="mini g-mini g-srank">班/校</th>`:""}`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d")}</th>${hasSR?'<th class="mini g-mini g-srank">班/校</th>':''}</tr></thead>
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
-        const r=ranks[s.id];
         const srnk=(ex.schoolRank||{})[s.id];
         const subjCells=ex.subjects.map(sub=>{
           const cur=(sc[sub]===undefined||sc[sub]===null||sc[sub]==="")?null:+sc[sub];
           const pe=subPrev[sub];const pv=pe?((pe.scores[s.id]||{})[sub]):undefined;
           const old=(pv!==undefined&&pv!=="")?+pv:null;
-          const sr=subjRanks[sub][s.id];
+          const srnkSubj=(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][s.id]);
           return `<td class="g-sub">${gradeEdit
             ?`<input class="fld" style="width:37px;padding:4px 2px;text-align:center" value="${sc[sub]!==undefined?esc(sc[sub]):""}" onchange="W.setScore('${ex.id}','${s.id}','${esc(sub)}',this.value)">`
             :(cur!==null?`<b style="cursor:pointer" title="查看历次${esc(sub)}成绩" onclick="W.subHist('${s.id}','${esc(sub)}')">${cur}</b>`:`<span class="muted" style="cursor:pointer" onclick="W.subHist('${s.id}','${esc(sub)}')">—</span>`)}</td>`
             +deltaCell(cur,old)
-            +`<td class="mini g-rank">${sr?`<b class="${sr<=3?"":"muted"}" style="${sr<=3?"color:var(--warn)":""}">${sr}</b>`:`<span class="muted">—</span>`}</td>`;
+            +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`<b>${srnkSubj}</b>`:`<span class="muted">—</span>`}</td>`:"");
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
-        return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}<td class="mini g-rank">${r?`<b class="${r<=3?"":""}" style="${r<=3?"color:var(--warn)":""}">${r}</b>`:`<span class="muted">—</span>`}</td>${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
+        return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
@@ -3359,7 +3359,7 @@ W.importNewExam=()=>{
   const date=$("#m_ed").value;
   pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
     if(err){toast(err);return;}
-    const ex={id:uid(),name,date,subjects:[],scores:{},schoolRank:{}};
+    const ex={id:uid(),name,date,subjects:[],scores:{},schoolRank:{},schoolRankBySubj:{}};
     S.students.forEach(s=>ex.scores[s.id]={});
     const r=applyGradeText(ex,text);
     if(!r.ok){toast(r.msg);return;}
@@ -3376,11 +3376,15 @@ W.editExam=id=>{const ex=el(id,S.exams);openModal(`<h3>编辑考试</h3>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doEditExam('${id}')">保存</button></div>`);};
 W.doEditExam=id=>{const ex=el(id,S.exams);ex.name=$("#m_en").value.trim();ex.date=$("#m_ed").value;ex.subjects=$("#m_es").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean);save();closeModal();refresh();};
 W.setScore=(eid,sid,sub,val)=>{const ex=el(eid,S.exams);if(!ex.scores[sid])ex.scores[sid]={};ex.scores[sid][sub]=val===""?undefined:val;const cnt=applyGradeRules(ex);save();setTimeout(()=>{if(gradeExam===eid)viewGrades(document.getElementById("view"));},0);if(cnt)toast("已按成绩记分 "+cnt+" 条");};
-W.exportGrades=id=>{const ex=el(id,S.exams);let csv="姓名,"+ex.subjects.join(",")+",总分,平均,排名,校排名\n";
+W.exportGrades=id=>{const ex=el(id,S.exams);
+  const srnkCols=ex.subjects.filter(sub=>(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub]&&Object.keys(ex.schoolRankBySubj[sub]).length));
+  let csv="姓名,"+ex.subjects.join(",")+(srnkCols.length?","+srnkCols.map(s=>s+"校排名").join(","):"")+",总分,平均,排名,校排名\n";
   const ranks=gradeRanks(ex);
   S.students.forEach(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
     const srnk=ex.schoolRank&&ex.schoolRank[s.id];
-    csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")+`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""},${srnk||""}\n`;});
+    csv+=`${s.name},`+ex.subjects.map(sub=>sc[sub]!==undefined?sc[sub]:"").join(",")
+      +(srnkCols.length?","+srnkCols.map(sub=>(ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][s.id])||"").join(","):"")
+      +`,${n?sum:""},${n?Math.round(sum/n):""},${ranks[s.id]||""},${srnk||""}\n`;});
   downloadCSV(ex.name,csv);};
 /* 考试记录：改备注 / 删除考试（连同成绩，撤销成绩规则自动记分） */
 W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
@@ -5750,23 +5754,32 @@ W.exportRoster=()=>{
 };
 /* 解析成绩 CSV 文本并写入考试 ex；返回 {ok,msg,n,miss,subs,cnt}（纯函数）。
    表头按列名定位（兼容列顺序变化与中间空列）；「总分/平均/排名」等汇总列自动跳过，
-   使本应用导出的成绩 CSV 可直接回导而不产生假科目；「校排名」列会被识别并单独存入 ex.schoolRank。 */
+   使本应用导出的成绩 CSV 可直接回导而不产生假科目；「校排名」列存入 ex.schoolRank（总校级），
+   「语文校排名」等分科校排名列存入 ex.schoolRankBySubj[科目]。 */
 function applyGradeText(ex,text){
   if(!ex)return {ok:false,msg:"考试不存在"};
   const lines=String(text||"").replace(/^\ufeff/,"").trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(lines.length<2)return {ok:false,msg:"至少需要表头和一行数据"};
   const head=lines[0].split(/[,，]/).map(x=>x.trim());
   const SKIP={"总分":1,"平均":1,"平均分":1,"排名":1,"名次":1};
-  const isSR=h=>/校.{0,2}(排名|名次)|全校.?排名|学校.?排名/.test(h);
+  /* 总校级排名：表头为「校排名/校名次/全校排名/学校排名」等（不含科目前缀） */
+  const isTotalSR=h=>/^(校|全校|学校).{0,2}(排名|名次)$/.test(h);
+  /* 分科校排名：表头为「语文校排名/数学校名次/英语校排」等（科目名 + 校 + 排名类） */
+  const subjSR=h=>{const m=h.match(/^(.+?)\s*校(排名|名次|排|名)$/);return m?m[1]:null;};
   if(!ex.schoolRank)ex.schoolRank={};
-  const cols=[];let srCol=-1;
+  if(!ex.schoolRankBySubj)ex.schoolRankBySubj={};
+  const cols=[];let srCol=-1;const subjSRCols=[];
   head.forEach((h,i)=>{
     if(i===0||!h||SKIP[h])return;
-    if(isSR(h)){if(srCol<0)srCol=i;return;}
+    if(isTotalSR(h)){if(srCol<0)srCol=i;return;}
+    const ss=subjSR(h);
+    if(ss){if(!ex.schoolRankBySubj[ss])ex.schoolRankBySubj[ss]={};subjSRCols.push([ss,i]);return;}
     cols.push([h,i]);
   });
   if(!cols.length)return {ok:false,msg:"表头缺少科目"};
   cols.forEach(([s])=>{if(!ex.subjects.includes(s))ex.subjects.push(s);});
+  /* 分科校排名对应的科目若未在普通科目列出现，也登记为科目（避免 Phantom 列缺科目） */
+  subjSRCols.forEach(([sub])=>{if(!ex.subjects.includes(sub))ex.subjects.push(sub);});
   let n=0,miss=0;
   for(let i=1;i<lines.length;i++){
     const c=lines[i].split(/[,，]/).map(x=>x.trim());
@@ -5775,6 +5788,7 @@ function applyGradeText(ex,text){
     if(!ex.scores[st.id])ex.scores[st.id]={};
     cols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
     if(srCol>=0){const v=c[srCol];if(v!==""&&v!==undefined)ex.schoolRank[st.id]=v;}
+    subjSRCols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.schoolRankBySubj[sub][st.id]=v;});
     n++;
   }
   const cnt=applyGradeRules(ex);/* 按成绩规则自动录入加减分记录（幂等，重复导入会覆盖） */
