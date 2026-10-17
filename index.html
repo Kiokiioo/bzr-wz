@@ -302,6 +302,10 @@ table.tbl.grades .g-mini{width:45px}
 table.tbl.grades .g-rank{width:40px}
 table.tbl.grades .g-srank{width:44px}
 table.tbl.grades .g-total{width:50px}
+/* 成绩表：姓名列横向冻结（向右滚动时始终可见，纵向随表头一起保持顶部） */
+table.tbl.grades th.g-name{position:sticky;left:0;z-index:3;background:var(--panel);border-right:1px solid var(--line)}
+table.tbl.grades td.g-name{position:sticky;left:0;z-index:2;background:var(--panel);border-right:1px solid var(--line)}
+table.tbl.grades tbody tr:hover td.g-name{background:var(--panel-2)}
 table.tbl.roster th.sortable{padding:9px 4px}
 
 /* modal */
