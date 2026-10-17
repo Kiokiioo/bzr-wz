@@ -1727,7 +1727,7 @@ function viewGrades(v){
       return `<div class="r-item" style="padding:7px 0">
       <div style="flex:1;min-width:0"><b>${esc(e.name)}</b><div class="tiny muted">${esc(e.date||"")} · ${e.subjects.length} 科 · ${n} 人${e.note?" · "+esc(e.note):""}</div></div>
       <span class="r-act">
-        <button onclick="W.editGAdd('${e.id}')" title="改备注">改</button>
+        <button onclick="W.editGAdd('${e.id}')" title="修改名称/备注，或重新导入文件">修改</button>
         <button class="del" onclick="W.delGAdd('${e.id}')" title="删除这场考试及成绩">删</button>
       </span></div>`;}).join("")}
   </div>`;
@@ -3493,13 +3493,33 @@ W.exportGrades=id=>{const ex=el(id,S.exams);
     ex.subjects.forEach(sub=>{csv+=","+(sc[sub]!==undefined?sc[sub]:"");if(hasSubjSR(sub))csv+=","+((ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][s.id])||"");});
     csv+=","+(n?sum:"")+(hasTotalSR?","+(srnk||""):"")+","+(n?Math.round(sum/n):"")+","+(ranks[s.id]||"")+"\n";});
   downloadCSV(ex.name,csv);};
-/* 考试记录：改备注 / 删除考试（连同成绩，撤销成绩规则自动记分） */
+/* 考试记录：修改名称/备注、重新导入文件 / 删除考试（连同成绩，撤销成绩规则自动记分） */
 W.editGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
   openModal(`<h3>修改考试</h3>
-    <div class="field"><label class="lbl">考试</label><input class="fld" value="${esc(ex.name)}" disabled style="opacity:.6"></div>
+    <div class="field"><label class="lbl">考试名称</label><input class="fld" id="m_gn" value="${esc(ex.name)}"></div>
     <div class="field"><label class="lbl">备注</label><input class="fld" id="m_gx" value="${esc(ex.note||"")}" placeholder="如：成绩已录入"></div>
-    <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.saveGAdd('${ex.id}')">保存</button></div>`);};
+    <div class="tiny muted" style="margin:2px 0 4px">「重新导入文件」会按文件表头覆盖本场成绩、分科班/校与总级校排名（科目表头以文件为准）。</div>
+    <div class="foot">
+      <button class="btn ghost" onclick="closeModal()">取消</button>
+      <button class="btn ghost" onclick="W.reimportExam('${ex.id}')">重新导入文件</button>
+      <button class="btn" onclick="W.saveGAdd('${ex.id}')">保存</button>
+    </div>`);};
+W.reimportExam=id=>{
+  const ex=el(id,S.exams);if(!ex)return;
+  const gn=$("#m_gn"),gx=$("#m_gx");
+  if(gn&&gn.value.trim())ex.name=gn.value.trim();
+  if(gx)ex.note=(gx.value||"").trim();
+  pickFile(".csv,text/csv",f=>readFileAsText(f,(text,err)=>{
+    if(err||!text){toast("读取失败："+err);return;}
+    const r=applyGradeText(ex,text);
+    if(!r.ok){toast(r.msg||"导入失败");return;}
+    save();closeModal();viewGrades(document.getElementById("view"));
+    toast("已重新导入："+r.n+" 人 · "+r.subs+" 科"+(r.cnt?" · 自动记分 "+r.cnt+" 条":""));
+  }));
+};
 W.saveGAdd=id=>{const ex=el(id,S.exams);if(!ex)return;
+  const gn=$("#m_gn");
+  if(gn&&gn.value.trim())ex.name=gn.value.trim();
   ex.note=($("#m_gx").value||"").trim();
   save();closeModal();viewGrades(document.getElementById("view"));toast("已保存");};
 W.delGAdd=id=>{
@@ -5904,8 +5924,10 @@ function applyGradeText(ex,text){
     if(!st){miss++;continue;}
     if(!ex.scores[st.id])ex.scores[st.id]={};
     cols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.scores[st.id][sub]=v;});
-    if(srCol>=0){const v=c[srCol];if(v!==""&&v!==undefined)ex.schoolRank[st.id]=v;}
-    subjSRCols.forEach(([sub,idx])=>{const v=c[idx];if(v!==""&&v!==undefined)ex.schoolRankBySubj[sub][st.id]=v;});
+    /* 班/校 值归一化：Excel 把「1/1」误转成「1月1日」，导入时还原为「1/1」班排/校排格式 */
+    const fixSR=v=>{if(!v)return v;const m=/^(\d+)\s*月\s*(\d+)\s*日$/.exec(v);return m?m[1]+"/"+m[2]:v;};
+    if(srCol>=0){const v=fixSR(c[srCol]);if(v!==""&&v!==undefined)ex.schoolRank[st.id]=v;}
+    subjSRCols.forEach(([sub,idx])=>{const v=fixSR(c[idx]);if(v!==""&&v!==undefined)ex.schoolRankBySubj[sub][st.id]=v;});
     n++;
   }
   const cnt=applyGradeRules(ex);/* 按成绩规则自动录入加减分记录（幂等，重复导入会覆盖） */
