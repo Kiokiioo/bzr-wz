@@ -292,7 +292,8 @@ table.tbl.roster .c-hobby{max-width:160px;white-space:normal;line-height:1.4}
 table.tbl.roster .cv-m{display:none}
 /* 成绩表：列间距 4px + 固定列宽（姓名60 / 科目45 / 进退步45 / 排名40 / 总分50）
    width:auto → 表格收缩到列宽总和，不做整表拉伸（避免 fixed 布局按比例放大列宽） */
-table.tbl.grades{width:auto}
+/* 成绩表改用非合并边框：每格各自绘制边框，冻结的姓名列与非冻结列渲染一致（横线粗细统一） */
+table.tbl.grades{width:auto;border-collapse:separate;border-spacing:0}
 table.tbl.grades th{white-space:nowrap}
 table.tbl.grades th,table.tbl.grades td{padding:9px 4px;text-align:center}
 table.tbl.grades .mini{padding:9px 4px}
@@ -302,9 +303,9 @@ table.tbl.grades .g-mini{width:45px}
 table.tbl.grades .g-rank{width:40px}
 table.tbl.grades .g-srank{width:44px}
 table.tbl.grades .g-total{width:50px}
-/* 成绩表：姓名列横向冻结（向右滚动时始终可见，纵向随表头一起保持顶部） */
-table.tbl.grades th.g-name{position:sticky;left:0;z-index:3;background:var(--panel);border-right:1px solid var(--line)}
-table.tbl.grades td.g-name{position:sticky;left:0;z-index:2;background:var(--panel);border-right:1px solid var(--line)}
+/* 成绩表：姓名列横向冻结（向右滚动时始终可见，纵向随表头一起保持顶部）。边框由各格自备（separate），与非冻结列一致 */
+table.tbl.grades th.g-name{position:sticky;left:0;z-index:3;background:var(--panel);border-bottom:1px solid var(--line)}
+table.tbl.grades td.g-name{position:sticky;left:0;z-index:2;background:var(--panel);border-bottom:1px solid var(--line)}
 table.tbl.grades tbody tr:hover td.g-name{background:var(--panel-2)}
 table.tbl.roster th.sortable{padding:9px 4px}
 
@@ -1056,6 +1057,8 @@ function route(){
   document.getElementById("pageTitle").textContent=meta.t;
   document.getElementById("pageSub").textContent=SUB[h]||"";
   document.getElementById("view").innerHTML="";
+  /* 进入积分页时回到默认态：时间范围=最近一周、tab=个人积分、组排序=总分，不沿用上次选择 */
+  if(h==="points"){S.pointView={mode:"week",custom:{s:"",e:""}};ptTab="person";ptGrpSort="sum";save();}
   fn(document.getElementById("view"));
   document.querySelectorAll(".nav a,.bottom a").forEach(a=>a.classList.toggle("active",a.dataset.r===h));
   /* 手机端底部导航：把当前模块横向滚到可视区中部，避免深层模块藏在滚动区外 */
@@ -1648,7 +1651,9 @@ function viewGrades(v){
   const arrow=(k)=>gSort&&gSort.k===k?(gSort.dir===1?" ▲":" ▼"):"";
   const thCls=(k)=>gSort&&gSort.k===k?" sortable on":" sortable";
   /* 重渲前记住列表滚动位置（列表内部 + 页面 + 窗口），渲染后恢复——编辑/排序后停在原处，不跳顶 */
-  const _gOld=v.querySelector(".tbl-scroll"),_gSt=_gOld?_gOld.scrollTop:0,_gVs=v.scrollTop||0,_gWy=window.scrollY||0;
+  /* 重渲前记住所有可滚动表的横向+纵向位置，渲染后逐一恢复——排序/编辑后停在原处，不跳顶也不跳回最左 */
+  const _gOlds=[...v.querySelectorAll(".tbl-scroll")].map(e=>({t:e.scrollTop,l:e.scrollLeft}));
+  const _gVs=v.scrollTop||0,_gWy=window.scrollY||0;
   v.innerHTML=`
   <div class="between row wrap" style="margin-bottom:12px">
     <div class="row" style="gap:8px">
@@ -1707,9 +1712,9 @@ function viewGrades(v){
         <button class="del" onclick="W.delGAdd('${e.id}')" title="删除这场考试及成绩">删</button>
       </span></div>`;}).join("")}
   </div>`;
-  /* 恢复到编辑前的滚动位置（列表内部 + 页面 + 窗口） */
-  const _gNew=v.querySelector(".tbl-scroll");
-  if(_gNew&&_gSt)_gNew.scrollTop=_gSt;
+  /* 恢复到编辑/排序前的滚动位置（所有 .tbl-scroll 横向+纵向 + 页面 + 窗口） */
+  const _gNews=[...v.querySelectorAll(".tbl-scroll")];
+  _gNews.forEach((e,i)=>{const o=_gOlds[i];if(o){if(o.t)e.scrollTop=o.t;if(o.l)e.scrollLeft=o.l;}});
   if(_gVs)v.scrollTop=_gVs;
   if(_gWy)window.scrollTo(0,_gWy);
 }
