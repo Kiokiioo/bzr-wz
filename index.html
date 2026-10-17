@@ -315,6 +315,15 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .modal{background:var(--panel);border-radius:16px;box-shadow:var(--shadow-2);width:min(480px,100%);padding:20px;border:1px solid var(--line)}
 .modal h3{margin:0 0 14px;font-size:16px}
 .modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+/* 科目成绩历次弹窗：考试名称 / 成绩 / 排名（班内）/ 班·校 四列对齐 */
+.sh-wrap{border-top:none}
+.sh-row{display:grid;grid-template-columns:1fr 54px 64px 78px;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dashed var(--line)}
+.sh-row:last-child{border-bottom:none}
+.sh-row.sh-head{font-size:11px;color:var(--ink-2);font-weight:600;border-bottom:none;padding:6px 2px}
+.sh-name{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.sh-name .tiny{margin-top:2px}
+.sh-score,.sh-rank,.sh-sr{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-rank.top{color:var(--warn);font-weight:700}
 
 /* tabs */
 .tabs{display:flex;gap:4px;background:var(--panel-2);padding:4px;border-radius:11px;width:fit-content;margin-bottom:14px}
@@ -1689,7 +1698,7 @@ function viewGrades(v){
             +(hasSR_Subj[sub]?`<td class="mini g-rank">${srnkSubj?`<b>${srnkSubj}</b>`:`<span class="muted">—</span>`}</td>`:"");
         }).join("");
         const psum=prev?(()=>{let t=0,n=0;ex.subjects.forEach(sub=>{const v2=prev.scores[s.id]&&prev.scores[s.id][sub];if(v2!==undefined&&v2!==""){t+=+v2;n++;}});return n?t:null;})():null;
-        return `<tr><td class="g-name"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
+        return `<tr><td class="g-name" style="cursor:pointer" title="查看本次考试各科明细" onclick="W.stuExamDetail('${s.id}')"><b>${esc(s.name)}</b></td>${subjCells}<td class="g-total"><b>${sum||"—"}</b></td>${deltaCell(sum||null,psum)}${hasSR?`<td class="mini g-rank">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</td>`:""}</tr>`;
       }).join("")}</tbody></table>
     </div>
   </div>
@@ -1736,16 +1745,63 @@ function latestExamId(){
 W.subHist=(sid,sub)=>{
   const st=el(sid,S.students);if(!st)return;
   const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||"")).filter(e=>e.subjects.includes(sub));
+  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">排名</span><span class="sh-sr">班/校</span></div>`;
   const rows=list.map(e=>{
     const v=(e.scores[sid]||{})[sub];
     const has=v!==undefined&&v!=="";
     const rk=has?subjRankMap(e,sub)[sid]:null;
-    return `<div class="r-item" style="padding:7px 0">
-      <div style="flex:1;min-width:0"><b>${esc(e.name)}</b><div class="tiny muted">${esc(e.date||"")}</div></div>
-      <span class="row" style="gap:10px;flex:none">${has?`<b>${esc(v)}</b><span class="tiny ${rk&&rk<=3?"":"muted"}" style="${rk&&rk<=3?"color:var(--warn)":""}">第${rk}名</span>`:`<span class="tiny muted">未录入</span>`}</span></div>`;
+    const sr=has?((e.schoolRankBySubj&&e.schoolRankBySubj[sub]&&e.schoolRankBySubj[sub][sid])||null):null;
+    return `<div class="sh-row">
+      <span class="sh-name"><b>${esc(e.name)}</b><span class="tiny muted">${esc(e.date||"")}</span></span>
+      <span class="sh-score">${has?`<b>${esc(v)}</b>`:`<span class="muted">未录入</span>`}</span>
+      <span class="sh-rank${rk&&rk<=3?" top":""}">${rk?("第"+rk+"名"):`<span class="muted">—</span>`}</span>
+      <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
+    </div>`;
   }).join("");
   openModal(`<h3>${esc(st.name)} · ${esc(sub)}</h3>
-  ${rows||`<div class="empty">暂无该科目的考试</div>`}
+  ${rows?`<div class="sh-wrap">${head}${rows}</div>`:`<div class="empty">暂无该科目的考试</div>`}
+  <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
+};
+/* 点某学生姓名：弹窗列出他「本场考试」各科的成绩 / 进退步 / 班·校（含总分汇总行） */
+W.stuExamDetail=(sid)=>{
+  const st=el(sid,S.students);if(!st)return;
+  if(!gradeExam||!el(gradeExam,S.exams))gradeExam=latestExamId();
+  const ex=el(gradeExam,S.exams);
+  const srnk=(ex.schoolRank||{})[sid];
+  const head=`<div class="sh-row sh-head"><span>科目</span><span class="sh-score">成绩</span><span class="sh-rank">进退步</span><span class="sh-sr">班/校</span></div>`;
+  const rows=ex.subjects.map(sub=>{
+    const sc=ex.scores[sid]||{};
+    const v=sc[sub];
+    const has=v!==undefined&&v!=="";
+    const cur=has?+v:null;
+    /* 进退步：对比上一场「有该科目」的考试（与成绩表里单科进退步口径一致） */
+    const pe=prevExamForSub(ex,sub);
+    const pv=pe?((pe.scores[sid]||{})[sub]):undefined;
+    const old=(pv!==undefined&&pv!=="")?+pv:null;
+    let dHtml=`<span class="muted">—</span>`;
+    if(cur!==null&&old!==null){const d=cur-old;dHtml=!d?`<span class="muted">0</span>`:`<b style="color:${d>0?"var(--ok)":"var(--bad)"}">${d>0?"+"+d:d}</b>`;}
+    const sr=(ex.schoolRankBySubj&&ex.schoolRankBySubj[sub]&&ex.schoolRankBySubj[sub][sid]);
+    return `<div class="sh-row">
+      <span class="sh-name"><b>${esc(sub)}</b></span>
+      <span class="sh-score">${has?`<b>${esc(v)}</b>`:`<span class="muted">未录入</span>`}</span>
+      <span class="sh-rank">${dHtml}</span>
+      <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
+    </div>`;
+  }).join("");
+  /* 总分汇总行：总分 / 总分进退步（对比紧邻上一场同口径总分） / 总级班·校 */
+  let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=(ex.scores[sid]||{})[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
+  const prev=prevExam(ex);
+  let psum=null;if(prev){let t=0,m=0;ex.subjects.forEach(sub=>{const v2=prev.scores[sid]&&prev.scores[sid][sub];if(v2!==undefined&&v2!==""){t+=+v2;m++;}});psum=m?t:null;}
+  let dtHtml=`<span class="muted">—</span>`;
+  if(n&&psum!==null){const d=sum-psum;dtHtml=!d?`<span class="muted">0</span>`:`<b style="color:${d>0?"var(--ok)":"var(--bad)"}">${d>0?"+"+d:d}</b>`;}
+  const totalRow=`<div class="sh-row" style="font-weight:700">
+      <span class="sh-name"><b>总分</b></span>
+      <span class="sh-score"><b>${n?sum:"—"}</b></span>
+      <span class="sh-rank">${dtHtml}</span>
+      <span class="sh-sr">${srnk?`<b>${srnk}</b>`:`<span class="muted">—</span>`}</span>
+    </div>`;
+  openModal(`<h3>${esc(st.name)} · ${esc(ex.name)}</h3>
+  <div class="sh-wrap">${head}${rows}${totalRow}</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
 };
 /* 各科进退步的对比考试：上一场「有该科目」的考试（日期早于本场，逐科往前找） */
@@ -2400,6 +2456,8 @@ function viewSeating(v){
     return `<span class="tiny" style="color:${a&&a!==b?"var(--warn)":"var(--ink-2)"}">${t}等 ${a}人 / ${t}座 ${b}个</span>`;
   }).join(`<span class="tiny muted"> · </span>`);
   const hint=zoneBrush?(zoneBrush==="X"?"标记中：点座位撤除该处等级":zoneBrush==="F"?"标记中：点座位固定 / 解除固定（刷新后仍保持）":"标记中：点座位涂 "+zoneBrush+"，再点笔刷退出"):"A/B/C 涂区域 · 定 固定座位（不可擦除/移动） · 清 除区域（固定座不动）";
+  /* 重渲前记住排位页横向滚动位置（拖拽换座后页面不刷新到最左） */
+  const _sOld=v.querySelector(".seat-scroll"),_sSl=_sOld?_sOld.scrollLeft:0,_sVs=v.scrollTop||0,_sWy=window.scrollY||0;
   v.innerHTML=`
   <div class="row wrap" style="margin-bottom:10px;justify-content:flex-end;gap:6px">
       <button class="btn ghost sm h30" onclick="W.clearSeat()">清空</button>
@@ -2454,6 +2512,11 @@ function viewSeating(v){
     </div>
     ${!S.students.length?`<div class="tiny muted" style="margin-top:10px">提示：先在「学生名册」添加学生，才能安排座位。</div>`:""}
   </div>`;
+  /* 重渲后恢复横向滚动位置 */
+  const _sNew=v.querySelector(".seat-scroll");
+  if(_sNew&&_sSl)_sNew.scrollLeft=_sSl;
+  if(_sVs)v.scrollTop=_sVs;
+  if(_sWy)window.scrollTo(0,_sWy);
 }
 
 /* ============ TIERS (学生等级) ============ */
