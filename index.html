@@ -226,11 +226,8 @@ html[data-theme="dark"] .task-card:hover{background:color-mix(in srgb,var(--bran
 .stat-link:hover{border-color:var(--brand);background:var(--brand-soft)}
 #homeBlocks{display:flex;flex-direction:column;gap:14px}
 .home-block{position:relative}
-.hb-handle{position:absolute;top:8px;right:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);font-size:15px;line-height:1;cursor:grab;touch-action:none;z-index:2}
-.hb-handle:active{cursor:grabbing}
 .home-block.hb-dragging{opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.18);border-radius:12px}
-.home-block.edit .chip.brand{display:none}
-.home-block.edit{cursor:default}
+body.hb-dragging-on{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grabbing}
 .recent .r-item,.r-item{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
 .recent .r-item:last-child,.r-item:last-child{border-bottom:none}
 .r-item:hover{background:var(--panel-2)}
@@ -1109,7 +1106,6 @@ const SUB={
 };
 
 /* ============ HOME ============ */
-let homeEditMode=false;
 function viewHome(v){
   const daily=S.todos.filter(t=>(t.type||"日常")==="日常");
   const today=daily.filter(t=>t.list==="今天"&&!t.done);
@@ -1160,56 +1156,46 @@ function viewHome(v){
   let order=(S.homeOrder||[]).filter(id=>ids.includes(id));
   ids.forEach(id=>{ if(!order.includes(id)) order.push(id); });
   const byId=Object.fromEntries(blocks.map(b=>[b.id,b.html]));
-  const renderIds=order.filter(id=>{
-    const h=byId[id];
-    if(!h||!h.trim()){ return id==="memo" && homeEditMode; }
-    return true;
-  });
-  const handle=homeEditMode?`<div class="hb-handle" title="按住拖动调整顺序">⠿</div>`:"";
-  const blocksHtml=renderIds.map(id=>{
-    if(id==="memo" && (!byId[id]||!byId[id].trim())){
-      return `<div class="home-block edit" data-id="memo">${handle}<div class="card pad"><div class="section-title">备忘录</div><div class="empty">暂无置顶备忘录</div></div></div>`;
-    }
-    return `<div class="home-block${homeEditMode?" edit":""}" data-id="${id}">${handle}${byId[id]}</div>`;
-  }).join("");
+  const renderIds=order.filter(id=>{ const h=byId[id]; return h && h.trim(); });
+  const blocksHtml=renderIds.map(id=>`<div class="home-block" data-id="${id}">${byId[id]}</div>`).join("");
 
-  v.innerHTML=`
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-      <button class="btn h30" onclick="W.toggleHomeEdit()">${homeEditMode?"完成":"调整排版"}</button>
-    </div>
-    <div id="homeBlocks">${blocksHtml}</div>
-  `;
-  if(homeEditMode) initHomeDrag();
+  v.innerHTML=`<div id="homeBlocks">${blocksHtml}</div>`;
+  initHomeDrag();
 }
-W.toggleHomeEdit=()=>{
-  homeEditMode=!homeEditMode;
-  const v=document.getElementById("view");
-  if(v) viewHome(v);
-};
 function initHomeDrag(){
   const wrap=document.getElementById("homeBlocks");
   if(!wrap) return;
-  wrap.querySelectorAll(".hb-handle").forEach(h=>{
-    h.addEventListener("pointerdown",e=>{
-      e.preventDefault();
-      const el=h.closest(".home-block");
-      if(!el) return;
-      const r=el.getBoundingClientRect();
-      const offX=e.clientX-r.left, offY=e.clientY-r.top;
+  if(!initHomeDrag._ctx){
+    initHomeDrag._ctx=true;
+    document.addEventListener("contextmenu",e=>{ if(document.body.classList.contains("hb-dragging-on")) e.preventDefault(); });
+  }
+  wrap.querySelectorAll(".home-block").forEach(el=>{
+    el.addEventListener("pointerdown",e=>{
+      if(e.pointerType==="mouse" && e.button!==0) return;
+      if(e.target.closest("input,textarea,select")) return;
       const sx=e.clientX, sy=e.clientY;
-      const w=r.width;
-      let started=false;
-      try{ h.setPointerCapture(e.pointerId); }catch(_){}
+      let started=false, w=0, offX=0, offY=0;
+      const timer=setTimeout(()=>{
+        const r=el.getBoundingClientRect();
+        w=r.width; offX=sx-r.left; offY=sy-r.top;
+        started=true;
+        el.style.width=w+"px";
+        el.style.position="fixed";
+        el.style.zIndex="1000";
+        el.style.pointerEvents="none";
+        el.classList.add("hb-dragging");
+        document.body.classList.add("hb-dragging-on");
+      },500);
       const onMove=ev=>{
         if(!started){
-          if(Math.abs(ev.clientX-sx)<5 && Math.abs(ev.clientY-sy)<5) return;
-          started=true;
-          el.style.width=w+"px";
-          el.style.position="fixed";
-          el.style.zIndex="1000";
-          el.style.pointerEvents="none";
-          el.classList.add("hb-dragging");
+          if(Math.abs(ev.clientX-sx)>8 || Math.abs(ev.clientY-sy)>8){
+            clearTimeout(timer);
+            document.removeEventListener("pointermove",onMove);
+            document.removeEventListener("pointerup",onUp);
+          }
+          return;
         }
+        ev.preventDefault();
         el.style.left=(ev.clientX-offX)+"px";
         el.style.top=(ev.clientY-offY)+"px";
         const others=[...wrap.querySelectorAll(".home-block")].filter(b=>b!==el);
@@ -1222,18 +1208,22 @@ function initHomeDrag(){
         else wrap.appendChild(el);
       };
       const onUp=()=>{
-        h.removeEventListener("pointermove",onMove);
-        h.removeEventListener("pointerup",onUp);
+        clearTimeout(timer);
+        document.removeEventListener("pointermove",onMove);
+        document.removeEventListener("pointerup",onUp);
         if(started){
           el.style.position="";el.style.zIndex="";el.style.width="";el.style.left="";el.style.top="";el.style.pointerEvents="";
           el.classList.remove("hb-dragging");
+          document.body.classList.remove("hb-dragging-on");
           S.homeOrder=[...wrap.querySelectorAll(".home-block")].map(b=>b.dataset.id);
           save();
           toast("已保存排版顺序");
+          const stop=ev=>{ ev.stopPropagation(); ev.preventDefault(); };
+          document.addEventListener("click",stop,{capture:true,once:true});
         }
       };
-      h.addEventListener("pointermove",onMove);
-      h.addEventListener("pointerup",onUp);
+      document.addEventListener("pointermove",onMove);
+      document.addEventListener("pointerup",onUp);
     });
   });
 }
