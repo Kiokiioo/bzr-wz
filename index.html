@@ -1651,6 +1651,12 @@ function viewGrades(v){
       if(k==="r"){const rr=ranks[s.id];return rr===undefined?null:rr;}
       const sub=k.slice(2);const rr=(subjRanks[sub]||{})[s.id];return rr===undefined?null:rr;
     }
+    if(k==="sr"){/* 校进退步：上次校排名 − 本次校排名，缺值沉底 */
+      const curSR=(ex.schoolRank||{})[s.id];
+      const prevSR=prev&&prev.schoolRank&&prev.schoolRank[s.id]!==undefined?prev.schoolRank[s.id]:null;
+      if(curSR===undefined||curSR===null||prevSR===null)return null;
+      return prevSR-curSR;
+    }
     const v2=sc[k];return (v2===undefined||v2==="")?null:+v2;
   };
   const rows=[...S.students];
@@ -1689,7 +1695,7 @@ function viewGrades(v){
         <button class="btn sm" onclick="W.editExam('${ex.id}')">科目/名称</button>
       </div></div>
     <div class="tbl-scroll">
-      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th>${hasSR_Subj[s]?`<th class="mini g-mini g-srank">班/校</th>`:""}`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)" title="总分进退步">进退步${arrow("d")}</th>${hasSR?'<th class="mini g-mini g-srank" title="总排名 = 班排名/校排名">总排名</th><th class="mini g-mini g-delta" title="校排名进退步：本次校排名 − 上次考试校排名（正=前进）">校进退步</th>':''}</tr></thead>
+      <table class="tbl grades"><thead><tr><th class="g-name${thCls("name")}" data-k="name" onclick="W.sortGrades(this.dataset.k)">姓名${arrow("name")}</th>${ex.subjects.map(s=>`<th class="g-sub${thCls(s)}" data-k="${esc(s)}" onclick="W.sortGrades(this.dataset.k)">${esc(s)}${arrow(s)}</th><th class="mini g-mini g-delta${thCls("d:"+s)}" data-k="d:${esc(s)}" onclick="W.sortGrades(this.dataset.k)">进退步${arrow("d:"+s)}</th>${hasSR_Subj[s]?`<th class="mini g-mini g-srank">班/校</th>`:""}`).join("")}<th class="g-total${thCls("sum")}" data-k="sum" onclick="W.sortGrades(this.dataset.k)">总分${arrow("sum")}</th><th class="mini g-mini g-delta${thCls("d")}" data-k="d" onclick="W.sortGrades(this.dataset.k)" title="总分进退步">进退步${arrow("d")}</th>${hasSR?'<th class="mini g-mini g-srank" title="总排名 = 班排名/校排名">总排名</th>':''}${hasSR?`<th class="mini g-mini g-delta${thCls("sr")}" data-k="sr" onclick="W.sortGrades(this.dataset.k)" title="校排名进退步：本次校排名 − 上次考试校排名（正=前进，点按排序）">校进退步${arrow("sr")}</th>`:''}</tr></thead>
       <tbody>${rows.map(s=>{
         const sc=ex.scores[s.id]||{};let sum=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;}});
         const srnk=(ex.schoolRank||{})[s.id];
