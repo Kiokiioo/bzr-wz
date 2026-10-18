@@ -1321,12 +1321,8 @@ function todayLessonsCard(){
     }
   }
   return `<div class="card pad">
-    <div class="between row" style="margin-bottom:8px">
-      <span class="section-title" style="margin:0">今日课程</span>
-      <span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span>
-    </div>
-    <div class="between row" style="margin-bottom:12px">
-      <div class="row" style="gap:6px;flex-wrap:wrap">${wkTag}</div>
+    <div class="between row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap"><span class="section-title" style="margin:0">今日课程</span>${wkTag}<span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span></div>
       <a class="chip brand" href="#schedule" style="text-decoration:none">查看课表</a>
     </div>
     ${body}
