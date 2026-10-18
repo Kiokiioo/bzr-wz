@@ -175,7 +175,7 @@ details.collapse[open]>summary .chev{transform:rotate(90deg)}
 .cols-4{grid-template-columns:repeat(4,1fr)}
 
 /* home */
-.hero{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+.hero{display:grid;grid-template-columns:1fr;gap:14px}
 /* task card (事务安排) */
 .task-list{display:flex;flex-direction:column;gap:12px}
 /* 事务安排页：保留边框卡片布局（首页为无边框+虚线，勿混用） */
@@ -219,9 +219,18 @@ html[data-theme="dark"] .task-card:hover{background:color-mix(in srgb,var(--bran
 .hero .today .task-card .date{font-size:16px;min-width:40px}
 .hero .today .task-card .title{font-size:14px}
 .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.quick a{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;padding:13px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);text-decoration:none;color:var(--ink);font-weight:600}
+.quick a{display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;text-align:center;padding:13px;height:75px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);text-decoration:none;color:var(--ink);font-weight:600}
 .quick a .qic{font-size:20px}
 .quick a:hover{border-color:var(--brand);background:var(--brand-soft)}
+.stat-link{text-decoration:none;color:inherit;cursor:pointer}
+.stat-link:hover{border-color:var(--brand);background:var(--brand-soft)}
+#homeBlocks{display:flex;flex-direction:column;gap:14px}
+.home-block{position:relative}
+.hb-handle{position:absolute;top:8px;right:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);font-size:15px;line-height:1;cursor:grab;touch-action:none;z-index:2}
+.hb-handle:active{cursor:grabbing}
+.home-block.hb-dragging{opacity:.92;box-shadow:0 10px 28px rgba(0,0,0,.18);border-radius:12px}
+.home-block.edit .chip.brand{display:none}
+.home-block.edit{cursor:default}
 .recent .r-item,.r-item{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);align-items:flex-start}
 .recent .r-item:last-child,.r-item:last-child{border-bottom:none}
 .r-item:hover{background:var(--panel-2)}
@@ -1100,6 +1109,7 @@ const SUB={
 };
 
 /* ============ HOME ============ */
+let homeEditMode=false;
 function viewHome(v){
   const daily=S.todos.filter(t=>(t.type||"日常")==="日常");
   const today=daily.filter(t=>t.list==="今天"&&!t.done);
@@ -1108,10 +1118,10 @@ function viewHome(v){
   const total=S.students.length;
   const doneToday=daily.filter(t=>t.list==="今天"&&t.done).length;
   const pct=total?Math.round(doneToday/(doneToday+today.length||1)*100):0;
-  v.innerHTML=`
-  ${todayLessonsCard()}
-  <div class="hero" style="margin-top:14px">
-    <div class="card pad today">
+
+  const blocks=[
+    {id:"lessons", html:todayLessonsCard()},
+    {id:"todos", html:`<div class="hero"><div class="card pad today">
       <div class="between row" style="margin-bottom:12px">
         <span class="section-title" style="margin:0">今天待办</span>
         <a class="chip brand" href="#todos" style="text-decoration:none">查看全部</a>
@@ -1122,29 +1132,110 @@ function viewHome(v){
         <button class="btn h30" style="flex:none" onclick="W.addHomeTask()">添加</button>
       </div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)" class="small muted">本周还有 ${week.length} 项待办</div>
-    </div>
-    <div class="card pad">
+    </div></div>`},
+    {id:"overview", html:`<div class="card pad">
       <div class="section-title">班级概览</div>
       <div class="grid cols-3" style="gap:10px">
-        <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${total}</span><span class="t">学生数</span></div></div>
-        <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${S.exams.length}</span><span class="t">考试场次</span></div></div>
-        <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${pct}%</span><span class="t">今日完成</span></div></div>
+        <a class="card pad stat-link" style="text-align:center" href="#roster"><div class="stat"><span class="n">${total}</span><span class="t">学生数</span></div></a>
+        <a class="card pad stat-link" style="text-align:center" href="#grades"><div class="stat"><span class="n">${S.exams.length}</span><span class="t">考试场次</span></div></a>
+        <a class="card pad stat-link" style="text-align:center" href="#todos"><div class="stat"><span class="n">${pct}%</span><span class="t">今日完成</span></div></a>
       </div>
-      <div class="section-title" style="margin-top:16px">快捷入口</div>
+    </div>`},
+    {id:"quick", html:`<div class="card pad">
+      <div class="section-title">快捷入口</div>
       <div class="quick">
         <a href="#lottery"><span class="qic">🎲</span>抽签</a>
         <a href="#jobs"><span class="qic">🧹</span>工作</a>
         <a href="#grades"><span class="qic">📊</span>成绩</a>
         <a href="#behavior"><span class="qic">📝</span>记行为</a>
       </div>
+    </div>`},
+    {id:"recent", html:`<div class="card pad recent">
+      <div class="section-title">最近记录</div>
+      ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
+    </div>`},
+    {id:"memo", html:memoHomeCard()},
+  ];
+  const ids=blocks.map(b=>b.id);
+  let order=(S.homeOrder||[]).filter(id=>ids.includes(id));
+  ids.forEach(id=>{ if(!order.includes(id)) order.push(id); });
+  const byId=Object.fromEntries(blocks.map(b=>[b.id,b.html]));
+  const renderIds=order.filter(id=>{
+    const h=byId[id];
+    if(!h||!h.trim()){ return id==="memo" && homeEditMode; }
+    return true;
+  });
+  const handle=homeEditMode?`<div class="hb-handle" title="按住拖动调整顺序">⠿</div>`:"";
+  const blocksHtml=renderIds.map(id=>{
+    if(id==="memo" && (!byId[id]||!byId[id].trim())){
+      return `<div class="home-block edit" data-id="memo">${handle}<div class="card pad"><div class="section-title">备忘录</div><div class="empty">暂无置顶备忘录</div></div></div>`;
+    }
+    return `<div class="home-block${homeEditMode?" edit":""}" data-id="${id}">${handle}${byId[id]}</div>`;
+  }).join("");
+
+  v.innerHTML=`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn h30" onclick="W.toggleHomeEdit()">${homeEditMode?"完成":"调整排版"}</button>
     </div>
-  </div>
-  <div class="card pad recent" style="margin-top:14px">
-    <div class="section-title">最近记录</div>
-    ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
-  </div>
-  ${memoHomeCard()}
-`;
+    <div id="homeBlocks">${blocksHtml}</div>
+  `;
+  if(homeEditMode) initHomeDrag();
+}
+W.toggleHomeEdit=()=>{
+  homeEditMode=!homeEditMode;
+  const v=document.getElementById("view");
+  if(v) viewHome(v);
+};
+function initHomeDrag(){
+  const wrap=document.getElementById("homeBlocks");
+  if(!wrap) return;
+  wrap.querySelectorAll(".hb-handle").forEach(h=>{
+    h.addEventListener("pointerdown",e=>{
+      e.preventDefault();
+      const el=h.closest(".home-block");
+      if(!el) return;
+      const r=el.getBoundingClientRect();
+      const offX=e.clientX-r.left, offY=e.clientY-r.top;
+      const sx=e.clientX, sy=e.clientY;
+      const w=r.width;
+      let started=false;
+      try{ h.setPointerCapture(e.pointerId); }catch(_){}
+      const onMove=ev=>{
+        if(!started){
+          if(Math.abs(ev.clientX-sx)<5 && Math.abs(ev.clientY-sy)<5) return;
+          started=true;
+          el.style.width=w+"px";
+          el.style.position="fixed";
+          el.style.zIndex="1000";
+          el.style.pointerEvents="none";
+          el.classList.add("hb-dragging");
+        }
+        el.style.left=(ev.clientX-offX)+"px";
+        el.style.top=(ev.clientY-offY)+"px";
+        const others=[...wrap.querySelectorAll(".home-block")].filter(b=>b!==el);
+        let ref=null;
+        for(const b of others){
+          const br=b.getBoundingClientRect();
+          if(ev.clientY < br.top+br.height/2){ ref=b; break; }
+        }
+        if(ref) wrap.insertBefore(el, ref);
+        else wrap.appendChild(el);
+      };
+      const onUp=()=>{
+        h.removeEventListener("pointermove",onMove);
+        h.removeEventListener("pointerup",onUp);
+        if(started){
+          el.style.position="";el.style.zIndex="";el.style.width="";el.style.left="";el.style.top="";el.style.pointerEvents="";
+          el.classList.remove("hb-dragging");
+          S.homeOrder=[...wrap.querySelectorAll(".home-block")].map(b=>b.dataset.id);
+          save();
+          toast("已保存排版顺序");
+        }
+      };
+      h.addEventListener("pointermove",onMove);
+      h.addEventListener("pointerup",onUp);
+    });
+  });
 }
 W.addHomeTask=()=>{
   const i=$("#homeTaskInput");if(!i)return;
@@ -1239,7 +1330,7 @@ function todayLessonsCard(){
       body=ls.map(row).join("");
     }
   }
-  return `<div class="card pad" style="margin-top:14px">
+  return `<div class="card pad">
     <div class="between row" style="margin-bottom:12px">
       <div class="row" style="gap:8px;align-items:center">${wkTag}<span class="section-title" style="margin:0">今日课程</span><span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span></div>
       <a class="chip brand" href="#schedule" style="text-decoration:none">查看课表</a>
@@ -1260,7 +1351,7 @@ function memoHomeCard(){
         <div class='tiny muted' style='margin-top:2px'>${esc(m.time||'')}</div>
       </div>
     </div>`).join('');
-  return `<div class='card pad' style='margin-top:14px'>
+  return `<div class='card pad'>
     <div class='between row' style='margin-bottom:12px'>
       <span class='section-title' style='margin:0'>备忘录</span>
       <a class='chip brand' href='#memo' style='text-decoration:none'>查看全部</a>
