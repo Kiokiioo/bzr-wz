@@ -1292,7 +1292,7 @@ function buildTodayLessons(){
 }
 function todayLessonsCard(){
   const d=buildTodayLessons();
-  const wkTag=d.week?`<span class="chip brand" title="按学期开始日期推算的教学周">第 ${d.week.n} 周 · ${d.week.parity==="o"?"单周":"双周"}</span>`:"";
+  const wkTag=d.week?`<span class="chip brand" title="按学期开始日期推算的教学周">第 ${d.week.n} 周</span><span class="chip brand">${d.week.parity==="o"?"单周":"双周"}</span>`:"";
   const row=L=>`
       <div class="cls-row">
         <div class="cls-prd"><b>${esc(L.label)}</b>${L.time?`<span class="cls-time">${esc(L.time)}</span>`:""}</div>
@@ -1321,8 +1321,12 @@ function todayLessonsCard(){
     }
   }
   return `<div class="card pad">
+    <div class="between row" style="margin-bottom:8px">
+      <span class="section-title" style="margin:0">今日课程</span>
+      <span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span>
+    </div>
     <div class="between row" style="margin-bottom:12px">
-      <div class="row" style="gap:8px;align-items:center">${wkTag}<span class="section-title" style="margin:0">今日课程</span><span class="chip brand" style="background:var(--brand-soft);color:var(--brand-ink)">${partName}</span></div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">${wkTag}</div>
       <a class="chip brand" href="#schedule" style="text-decoration:none">查看课表</a>
     </div>
     ${body}
