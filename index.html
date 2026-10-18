@@ -218,7 +218,7 @@ html[data-theme="dark"] .task-card:hover{background:color-mix(in srgb,var(--bran
 .hero .today .task-card + .task-card{border-top:1px dashed var(--line)}
 .hero .today .task-card .date{font-size:16px;min-width:40px}
 .hero .today .task-card .title{font-size:14px}
-.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .quick a{display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;padding:13px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line);text-decoration:none;color:var(--ink);font-weight:600}
 .quick a .qic{font-size:20px}
 .quick a:hover{border-color:var(--brand);background:var(--brand-soft)}
@@ -318,7 +318,6 @@ table.tbl.roster th.sortable{padding:9px 4px}
 /* 科目成绩历次弹窗：考试名称 / 成绩 / 排名（班内）/ 班·校 四列对齐 */
 .sh-wrap{border-top:none}
 .sh-row{display:grid;grid-template-columns:1fr 54px 64px 78px;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px dashed var(--line)}
-.sh-row.sh-3{grid-template-columns:1fr 54px 78px}/* 总分弹窗 3 列：考试-成绩-总排名 */
 .sh-row:last-child{border-bottom:none}
 .sh-row.sh-head{font-size:11px;color:var(--ink-2);font-weight:600;border-bottom:none;padding:6px 2px}
 .sh-name{min-width:0;display:flex;flex-direction:column;line-height:1.25}
@@ -550,7 +549,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .hero > *{min-width:0}
   .hero .today .between.row{flex-wrap:wrap;gap:6px}
   .hero .today .between.row > .chip{margin-left:auto}
-  .quick{grid-template-columns:1fr 1fr;min-width:0}
+  .quick{grid-template-columns:repeat(4,1fr);min-width:0}
   .quick a{min-width:0}
   .cols-2,.cols-4{grid-template-columns:1fr}
   .cols-3{grid-template-columns:repeat(3,1fr);gap:8px}
@@ -942,7 +941,7 @@ function clearAllAsk(){
 const NAV=[
   {r:"home",t:"首页",ic:"🏠"},
   {r:"roster",t:"学生名册",ic:"👥"},
-  {r:"grades",t:"成绩管理",ic:"📊"},
+  {r:"grades",t:"成绩",ic:"📊"},
   {r:"seating",t:"排位",ic:"🪑"},
   {r:"behavior",t:"行为记录",ic:"📝"},
   {r:"behtypes",t:"行为类别",ic:"🏷️",hide:true},
@@ -951,7 +950,7 @@ const NAV=[
   {r:"lottery",t:"抽签",ic:"🎲"},
   {r:"fee",t:"班费支出",ic:"💰"},
   {r:"schedule",t:"课表",ic:"📅"},
-  {r:"jobs",t:"班级工作",ic:"🧹"},
+  {r:"jobs",t:"工作",ic:"🧹"},
   {r:"todos",t:"事务安排",ic:"✅"},
   {r:"memo",t:"备忘录",ic:"📌"},
   {r:"data",t:"数据",ic:"🗄️"}
@@ -1110,7 +1109,8 @@ function viewHome(v){
   const doneToday=daily.filter(t=>t.list==="今天"&&t.done).length;
   const pct=total?Math.round(doneToday/(doneToday+today.length||1)*100):0;
   v.innerHTML=`
-  <div class="hero">
+  ${todayLessonsCard()}
+  <div class="hero" style="margin-top:14px">
     <div class="card pad today">
       <div class="between row" style="margin-bottom:12px">
         <span class="section-title" style="margin:0">今天待办</span>
@@ -1124,22 +1124,21 @@ function viewHome(v){
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)" class="small muted">本周还有 ${week.length} 项待办</div>
     </div>
     <div class="card pad">
-      <div class="section-title">快捷入口</div>
-      <div class="quick">
-        <a href="#lottery"><span class="qic">🎲</span>抽签</a>
-        <a href="#behavior"><span class="qic">📝</span>记行为</a>
-        <a href="#grades"><span class="qic">📊</span>成绩管理</a>
-        <a href="#jobs"><span class="qic">🧹</span>班级工作</a>
-      </div>
-      <div class="section-title" style="margin-top:16px">班级概览</div>
+      <div class="section-title">班级概览</div>
       <div class="grid cols-3" style="gap:10px">
         <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${total}</span><span class="t">学生数</span></div></div>
         <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${S.exams.length}</span><span class="t">考试场次</span></div></div>
         <div class="card pad" style="text-align:center"><div class="stat"><span class="n">${pct}%</span><span class="t">今日完成</span></div></div>
       </div>
+      <div class="section-title" style="margin-top:16px">快捷入口</div>
+      <div class="quick">
+        <a href="#lottery"><span class="qic">🎲</span>抽签</a>
+        <a href="#jobs"><span class="qic">🧹</span>工作</a>
+        <a href="#grades"><span class="qic">📊</span>成绩</a>
+        <a href="#behavior"><span class="qic">📝</span>记行为</a>
+      </div>
     </div>
   </div>
-  ${todayLessonsCard()}
   <div class="card pad recent" style="margin-top:14px">
     <div class="section-title">最近记录</div>
     ${recent.length?recent.slice(0,8).map(r=>`<div class="r-item"><span class="r-dot" style="background:${r.dot};color:${r.dot}"></span><div style="flex:1"><div>${r.txt}</div><div class="tiny muted">${esc(r.t)}</div></div></div>`).join(""):`<div class="empty">还没有记录</div>`}
@@ -1818,20 +1817,30 @@ W.stuExamDetail=(sid)=>{
   <div class="sh-wrap">${head}${rows}${totalRow}</div>
   <div class="foot"><button class="btn ghost" onclick="closeModal()">关闭</button></div>`);
 };
-/* 点某学生总分：弹窗列出他所有考试的总分 / 总分排名 / 总级班·校（与单科历次弹窗同布局） */
+/* 点某学生总分：弹窗列出他所有考试的总分 / 总排名（班排/校排）/ 校进退步 */
 W.totalHist=(sid)=>{
   const st=el(sid,S.students);if(!st)return;
   const list=[...S.exams].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const head=`<div class="sh-row sh-head sh-3"><span>考试</span><span class="sh-score">成绩</span><span class="sh-sr">总排名</span></div>`;
-  const rows=list.map(e=>{
+  const head=`<div class="sh-row sh-head"><span>考试</span><span class="sh-score">成绩</span><span class="sh-rank">总排名</span><span class="sh-sr">校进退步</span></div>`;
+  const rows=list.map((e,idx)=>{
     const sc=e.scores[sid]||{};
     let sum=0,n=0;e.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});
     const has=n>0;
+    const rk=has?gradeRanks(e)[sid]:null;
     const sr=has?((e.schoolRank||{})[sid]||null):null;
-    return `<div class="sh-row sh-3">
+    const prevE=list[idx-1];
+    const prevSR=(has&&prevE)?((prevE.schoolRank||{})[sid]||null):null;
+    let srDelta='<span class="muted">—</span>';
+    if(sr!==null&&prevSR!==null){
+      const d=prevSR-sr;
+      if(!d)srDelta='<span class="muted">0</span>';
+      else srDelta=`<b style="color:${d>0?'var(--ok)':'var(--bad)'}">${d>0?'+'+d:d}</b>`;
+    }
+    return `<div class="sh-row">
       <span class="sh-name"><b>${esc(e.name)}</b><span class="tiny muted">${esc(e.date||"")}</span></span>
       <span class="sh-score">${has?`<b>${sum}</b>`:`<span class="muted">未录入</span>`}</span>
-      <span class="sh-sr">${sr?esc(sr):`<span class="muted">—</span>`}</span>
+      <span class="sh-rank${rk&&rk<=3?" top":""}">${rk!==null&&sr!==null?(rk+"/"+sr):`<span class="muted">—</span>`}</span>
+      <span class="sh-sr">${srDelta}</span>
     </div>`;
   }).join("");
   openModal(`<h3>${esc(st.name)} · 总分</h3>
@@ -1871,8 +1880,13 @@ function gradeTrendHtml(){
   let maxV=0;series.forEach(se=>se.pts.forEach(v=>{if(v!==null&&v>maxV)maxV=v;}));
   if(!maxV)return "";
   const top=Math.max(100,Math.ceil(maxV/10)*10);
-  const EW=96;/* 每个考试固定横向宽度(px)：不再随考试数均分整个图宽，考试多了整体变宽、横向滚动；96 给完整考试名留空间 */
-  const H=210,L=30,R=8,T=10,B=22;
+  const EW=50;/* 每个考试固定横向宽度(px)：不再随考试数均分整个图宽，考试多了整体变宽、横向滚动 */
+  const H=210,L=30,R=8,T=10;
+  const perLine=Math.max(1,Math.floor((EW-4)/9));/* 横轴考试名每行最多字数（约 9px/字，留边距） */
+  const exLabels=exams.map(e=>{const nm=e.name||"";const arr=[];for(let p=0;p<nm.length;p+=perLine)arr.push(nm.slice(p,p+perLine));return arr.length?arr:[""];});
+  const maxLines=exLabels.reduce((m,a)=>Math.max(m,a.length),1);
+  const lineH=10,bottomPad=4;
+  const B=16+maxLines*lineH;/* 底部留白随考试名行数动态增加，避免多行标签被裁切或与图体重叠 */
   const W2=L+R+Math.max(1,exams.length)*EW;
   const iw=W2-L-R,ih=H-T-B;
   const X=i=>L+EW*i;
@@ -1880,7 +1894,7 @@ function gradeTrendHtml(){
   let g="";
   for(let k=0;k<=4;k++){const v=Math.round(top*k/4),yy=+Y(v).toFixed(1);
     g+=`<line x1="${L}" y1="${yy}" x2="${W2-R}" y2="${yy}" stroke="var(--line)" stroke-width="1"/><text x="${L-4}" y="${yy+3}" text-anchor="end" font-size="9" fill="var(--ink-2)">${v}</text>`;}
-  exams.forEach((e,i)=>{g+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(e.name)}</text>`;});
+  exams.forEach((e,i)=>{exLabels[i].forEach((ln,j)=>{const y=(H-bottomPad)-(exLabels[i].length-1-j)*lineH;g+=`<text x="${X(i).toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" font-size="9" fill="var(--ink-2)">${esc(ln)}</text>`;});});
   let paths="",dots="";
   series.forEach(se=>{
     const c=colOf[se.sub];
