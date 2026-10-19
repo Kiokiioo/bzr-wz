@@ -352,16 +352,17 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .seat.markable{cursor:crosshair}
 .seat.fixed{border-style:solid}
 .seat .fx{position:absolute;top:4px;left:8px;font-size:11px;font-weight:800;line-height:1;color:var(--bad)}
-/* 组长标识：大组长「大」/ 小组长「小」，落右下角（左上=固定、右上=等级分区） */
-.seat .ld{position:absolute;bottom:4px;right:6px;font-size:10px;font-weight:800;line-height:1;padding:1px 4px;border-radius:4px;
+/* 底部行：组长「大/小」与「换/＋」按钮同排同尺寸（左上为固定、右上为等级分区、名字下方为等级徽标） */
+.seat-bot{position:absolute;left:0;right:0;bottom:4px;display:flex;align-items:center;justify-content:center;gap:6px;z-index:2}
+.seat .ld{font-size:10px;font-weight:800;line-height:1;padding:2px 8px;border-radius:6px;border:1px solid var(--line);
   background:color-mix(in srgb,var(--brand) 20%,var(--panel));color:var(--brand-ink)}
-/* 学生等级徽标（跟随 tierOf 实时）：落名字下方一行，A 绿 / B 琥珀 / C 红 / X 黑 / F 红 */
-.seat-tier{font-size:10px;font-weight:800;line-height:1;margin-top:2px;padding:1px 5px;border-radius:6px}
-.seat-tier.t-A{color:#fff;background:var(--ok)}
-.seat-tier.t-B{color:#1a1a1a;background:var(--warn)}
-.seat-tier.t-C{color:#fff;background:var(--bad)}
-.seat-tier.t-X{color:#fff;background:var(--ink)}
-.seat-tier.t-F{color:#fff;background:var(--bad)}
+/* 学生名字按等级着色（跟随 tierOf 实时）：A 绿 / B 琥珀 / C 红 / X 黑 / F 红；无等级时透明、沿用卡片默认字色 */
+.seat-st{font-size:14px;font-weight:700;line-height:1.25;padding:3px 10px;border-radius:99px;display:inline-block}
+.seat-st.t-A{color:#fff;background:var(--ok)}
+.seat-st.t-B{color:#fff;background:var(--warn)}
+.seat-st.t-C{color:#fff;background:var(--bad)}
+.seat-st.t-X{color:#fff;background:var(--ink)}
+.seat-st.t-F{color:#fff;background:var(--bad)}
 .brush{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center;line-height:1}
 .brush:hover{border-color:var(--brand)}
 .brush.on{border-color:var(--brand)}
@@ -384,7 +385,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
 .seat.filled:active{cursor:grabbing}
 .seat.dragover{border-color:var(--ok);background:var(--ok-soft)}
 /* 座位格内的「单个排位」按键：常驻半透明，聚焦/悬停/按下变实，避免遮挡姓名居中 */
-.seat-pick{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);font-size:10px;line-height:1;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--brand-ink);cursor:pointer;opacity:.55;transition:opacity .12s,border-color .12s,color .12s;z-index:2}
+.seat-pick{position:static;transform:none;font-size:10px;font-weight:800;line-height:1;padding:2px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--brand-ink);cursor:pointer;opacity:.55;transition:opacity .12s,border-color .12s,color .12s;z-index:2}
 .seat-pick:hover,.seat-pick:focus,.seat-pick:active{opacity:1;border-color:var(--brand);color:var(--brand);outline:none}
 /* 排位选择器里的学生条目 */
 .seat-opt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 10px;margin-bottom:4px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;font-size:13px;color:var(--ink)}
@@ -589,9 +590,10 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .seat .no{font-size:10px}
   .seat .zn{font-size:9px;top:3px;right:5px}
   .seat .fx{font-size:9px;top:3px;left:5px}
-  .seat .ld{font-size:9px;bottom:3px;right:4px}
-  .seat-tier{font-size:9px;margin-top:1px;padding:1px 4px}
-  .seat-pick{font-size:9px;padding:1px 5px;min-width:auto;min-height:auto;opacity:.45}
+  .seat-bot{bottom:3px;gap:5px}
+  .seat .ld{font-size:9px;padding:1px 5px}
+  .seat-st{font-size:12px;padding:2px 7px}
+  .seat-pick{font-size:9px;padding:1px 5px;opacity:.45}
   .seat-col-sep{width:6px}
   .st-tag{min-height:64px;font-size:11px}
   .tbl-scroll{max-height:none;-webkit-overflow-scrolling:touch}
@@ -2451,7 +2453,7 @@ function viewSeating(v){
         const z=S.seatZones[i];const fx=S.seatFixed[i];
         const trk=seatColTrack[c];
         h+=`<div class="seat ${st?"filled":""} ${z?"zone-"+z:""} ${fx?"fixed":""} ${zoneBrush?"markable":""}" data-idx="${i}" draggable="${st&&!zoneBrush&&!fx?"true":"false"}" ondragstart="W.dragStart(event,${i})" ondragover="event.preventDefault()" ondrop="W.dropSeat(event,${i})" ${zoneBrush?`onclick="W.paintZone(${i})"`:""} ondragenter="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" style="grid-column:${trk};grid-row:${rtr}">
-        ${st?`<div class="seat-st">${esc(st.name)}</div>${tierOf(st)?`<span class="seat-tier t-${tierOf(st)}">${esc(tierOf(st))}</span>`:""}`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}<button class="seat-pick" draggable="false" title="${st?"更换此座位的学生":"安排学生到此座位"}" onmousedown="event.stopPropagation()" ondragstart="event.preventDefault();event.stopPropagation()" onclick="event.stopPropagation();W.pickSeat(${i})">${st?"换":"＋"}</button></div>`;
+        ${st?`<div class="seat-st${tierOf(st)?` t-${tierOf(st)}`:""}">${esc(st.name)}</div>`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}<div class="seat-bot">${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}<button class="seat-pick" draggable="false" title="${st?"更换此座位的学生":"安排学生到此座位"}" onmousedown="event.stopPropagation()" ondragstart="event.preventDefault();event.stopPropagation()" onclick="event.stopPropagation();W.pickSeat(${i})">${st?"换":"＋"}</button></div></div>`;
         /* 大组之间插入列分隔条：位置按末列轨道查表（左/右模式偏移不同）。
            跨大组合并：该排带内 gi 与 gi+1 的学习组属同一合并段 → 竖虚线消失（合并忽略大组规则）。 */
         if(sepTrackOf[trk]){
