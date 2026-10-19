@@ -355,6 +355,13 @@ table.tbl.roster th.sortable{padding:9px 4px}
 /* 组长标识：大组长「大」/ 小组长「小」，落右下角（左上=固定、右上=等级分区） */
 .seat .ld{position:absolute;bottom:4px;right:6px;font-size:10px;font-weight:800;line-height:1;padding:1px 4px;border-radius:4px;
   background:color-mix(in srgb,var(--brand) 20%,var(--panel));color:var(--brand-ink)}
+/* 学生等级徽标（跟随 tierOf 实时）：落名字下方一行，A 绿 / B 琥珀 / C 红 / X 黑 / F 红 */
+.seat-tier{font-size:10px;font-weight:800;line-height:1;margin-top:2px;padding:1px 5px;border-radius:6px}
+.seat-tier.t-A{color:#fff;background:var(--ok)}
+.seat-tier.t-B{color:#1a1a1a;background:var(--warn)}
+.seat-tier.t-C{color:#fff;background:var(--bad)}
+.seat-tier.t-X{color:#fff;background:var(--ink)}
+.seat-tier.t-F{color:#fff;background:var(--bad)}
 .brush{width:30px;height:30px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center;line-height:1}
 .brush:hover{border-color:var(--brand)}
 .brush.on{border-color:var(--brand)}
@@ -583,6 +590,7 @@ table.tbl.roster th.sortable{padding:9px 4px}
   .seat .zn{font-size:9px;top:3px;right:5px}
   .seat .fx{font-size:9px;top:3px;left:5px}
   .seat .ld{font-size:9px;bottom:3px;right:4px}
+  .seat-tier{font-size:9px;margin-top:1px;padding:1px 4px}
   .seat-pick{font-size:9px;padding:1px 5px;min-width:auto;min-height:auto;opacity:.45}
   .seat-col-sep{width:6px}
   .st-tag{min-height:64px;font-size:11px}
@@ -1823,6 +1831,8 @@ function viewGrades(v){
   _gNews.forEach((e,i)=>{const o=_gOlds[i];if(o){if(o.t)e.scrollTop=o.t;if(o.l)e.scrollLeft=o.l;}});
   if(_gVs)v.scrollTop=_gVs;
   if(_gWy)window.scrollTo(0,_gWy);
+  /* 成绩曲线：默认横向滚动到最新一场考试（最右端）；标注某点时（trendMark）不抢滚动，便于查看该点 */
+  if(!trendMark){const gt=v.querySelector("#gradeTrendScroll");if(gt)requestAnimationFrame(()=>{gt.scrollLeft=gt.scrollWidth;});}
 }
 function gradeRanks(ex){
   const arr=S.students.map(s=>{const sc=ex.scores[s.id]||{};let sum=0,n=0;ex.subjects.forEach(sub=>{const v2=sc[sub];if(v2!==undefined&&v2!==""){sum+=+v2;n++;}});return {id:s.id,sum,n};}).filter(x=>x.n).sort((a,b)=>b.sum-a.sum);
@@ -2006,7 +2016,7 @@ function gradeTrendHtml(){
   return `<div class="card pad" style="margin-top:12px">
     <div class="between row wrap" style="margin-bottom:6px"><span class="section-title" style="margin:0">成绩曲线</span><span class="tiny muted">${trendSub?"只看："+esc(trendSub):"各科每次考试 · 班级平均分"}</span></div>
     <div class="row wrap" style="gap:10px;margin-bottom:4px">${legend}</div>
-    <div style="overflow-x:auto"><svg viewBox="0 0 ${W2} ${H}" style="width:${W2}px;height:auto;display:block">${g}${paths}${dots}</svg></div>
+    <div id="gradeTrendScroll" style="overflow-x:auto"><svg viewBox="0 0 ${W2} ${H}" style="width:${W2}px;height:auto;display:block">${g}${paths}${dots}</svg></div>
   </div>`;
 }
 /* 图例点选：聚焦单科 / 再点恢复全部 */
@@ -2441,7 +2451,7 @@ function viewSeating(v){
         const z=S.seatZones[i];const fx=S.seatFixed[i];
         const trk=seatColTrack[c];
         h+=`<div class="seat ${st?"filled":""} ${z?"zone-"+z:""} ${fx?"fixed":""} ${zoneBrush?"markable":""}" data-idx="${i}" draggable="${st&&!zoneBrush&&!fx?"true":"false"}" ondragstart="W.dragStart(event,${i})" ondragover="event.preventDefault()" ondrop="W.dropSeat(event,${i})" ${zoneBrush?`onclick="W.paintZone(${i})"`:""} ondragenter="this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" style="grid-column:${trk};grid-row:${rtr}">
-        ${st?`<div>${esc(st.name)}</div>`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}<button class="seat-pick" draggable="false" title="${st?"更换此座位的学生":"安排学生到此座位"}" onmousedown="event.stopPropagation()" ondragstart="event.preventDefault();event.stopPropagation()" onclick="event.stopPropagation();W.pickSeat(${i})">${st?"换":"＋"}</button></div>`;
+        ${st?`<div class="seat-st">${esc(st.name)}</div>${tierOf(st)?`<span class="seat-tier t-${tierOf(st)}">${esc(tierOf(st))}</span>`:""}`:`<div class="no">${c}-${r}</div>`}${z?`<span class="zn">${z}</span>`:""}${fx?`<span class="fx">定</span>`:""}${st&&leaderMap[st.id]?`<span class="ld" title="${leaderMap[st.id]==="大"?"大组长":"小组长"}">${leaderMap[st.id]}</span>`:""}<button class="seat-pick" draggable="false" title="${st?"更换此座位的学生":"安排学生到此座位"}" onmousedown="event.stopPropagation()" ondragstart="event.preventDefault();event.stopPropagation()" onclick="event.stopPropagation();W.pickSeat(${i})">${st?"换":"＋"}</button></div>`;
         /* 大组之间插入列分隔条：位置按末列轨道查表（左/右模式偏移不同）。
            跨大组合并：该排带内 gi 与 gi+1 的学习组属同一合并段 → 竖虚线消失（合并忽略大组规则）。 */
         if(sepTrackOf[trk]){
@@ -5051,6 +5061,7 @@ W.setManual=(id,t)=>{
   s.tier=t||"";save();
   const re=$("#modal").innerHTML;if(re)W.manualTiers();
   if((location.hash||"#home")==="#tiers")viewTiers(document.getElementById("view"));
+  if((location.hash||"#home")==="#seating")viewSeating(document.getElementById("view"));
 };
 
 /* ---- 排座 导入/导出（合一） ----
