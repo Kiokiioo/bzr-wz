@@ -1671,7 +1671,7 @@ W.stuRecent=sid=>{
     const d=b.delta||0;
     const c=d>0?"var(--ok)":d<0?"var(--bad)":"var(--muted)";
     return `<div class="r-item" style="padding:7px 0">
-      <div style="flex:1;min-width:0"><b>${esc(b.type)}</b>${b.reason?`<span class="small muted">：${esc(b.reason)}</span>`:""}<div class="tiny muted">${esc(b.time||"")}</div></div>
+      <div style="flex:1;min-width:0"><b>${esc(b.type)}</b>${b.reason?`<span class="small muted">：${esc(b.reason)}</span>`:""}<div class="tiny muted">${esc(fmtMin(b.time))}</div></div>
       <span style="flex:none"><b style="color:${c}">${d>0?"+":""}${d}</b></span></div>`;}).join("");
   openModal(`<h3>${esc(st.name)} · 最近表现</h3>
   ${rows||`<div class="empty">暂无表现记录</div>`}
@@ -2215,7 +2215,7 @@ function syncGradePoints(){
     bs.forEach(b=>{
       const d=b.delta||0;if(!d)return;
       S.points.scores[b.studentId]=(S.points.scores[b.studentId]||0)+d;
-      if(!S.points.logs.some(l=>l.behId===b.id))S.points.logs.push({id:uid(),studentId:b.studentId,delta:d,reason:"行为·"+GRADE_TYPE+"："+(b.reason||""),time:b.time,behId:b.id,auto:GRADE_TYPE,examId:b.examId});
+      if(!S.points.logs.some(l=>l.behId===b.id))S.points.logs.push({id:uid(),studentId:b.studentId,delta:d,reason:"行为·"+GRADE_TYPE+"："+(b.reason||""),time:(b.time||"").slice(0,16),behId:b.id,auto:GRADE_TYPE,examId:b.examId});
     });
   }
 }
@@ -2358,7 +2358,7 @@ function viewBehavior(v){
           ${dBadge}
           <span class="muted" style="font-size:13px">${esc(b.reason||"")}</span>
         </div>
-        <div class="tiny muted" style="margin-top:3px">${b.timeEnd?`${esc(b.timeStart||b.time)} ~ ${esc(b.timeEnd)}`:esc(b.time)}${d?` · 已计入总积分`:""}</div>
+        <div class="tiny muted" style="margin-top:3px">${b.timeEnd?`${esc(fmtMin(b.timeStart||b.time))} ~ ${esc(fmtMin(b.timeEnd))}`:esc(fmtMin(b.time))}${d?` · 已计入总积分`:""}</div>
       </div>
       <span class="r-act">
         <button onclick="W.editBehavior('${b.id}')">改</button>
@@ -3735,12 +3735,12 @@ W.doAddBehavior=()=>{
   if(isLeaveType(type)){
     const s=$("#m_btStart")?$("#m_btStart").value:"";
     const e=$("#m_btEnd")?$("#m_btEnd").value:"";
-    timeStart=s?s.replace("T"," "):nowStr();
-    timeEnd=e?e.replace("T"," "):timeStart;
+    timeStart=s?withSec(s.replace("T"," ")):nowStrS();
+    timeEnd=e?withSec(e.replace("T"," ")):timeStart;
     time=timeStart;
   }else{
     const rawT=$("#m_btime")?$("#m_btime").value:"";
-    time=rawT?rawT.replace("T"," "):nowStr();
+    time=rawT?withSec(rawT.replace("T"," ")):nowStrS();
   }
   /* 输入新类型并保存 → 自动登记进行为类别（扣分=红、加分=绿、0=品牌色） */
   if(type && !(Array.isArray(S.behTypes)?S.behTypes:[]).some(t=>t.k===type)){
@@ -3749,13 +3749,13 @@ W.doAddBehavior=()=>{
   const b={id:uid(),studentId:sid,type,reason:$("#m_br").value.trim(),time,delta,timeStart,timeEnd};
   S.behaviors.push(b);
   if(delta){S.points.scores[sid]=(S.points.scores[sid]||0)+delta;
-    S.points.logs.push({id:uid(),studentId:sid,delta,reason:"行为·"+type+(b.reason?"："+b.reason:""),time:b.time,behId:b.id});}
+    S.points.logs.push({id:uid(),studentId:sid,delta,reason:"行为·"+type+(b.reason?"："+b.reason:""),time:(b.time||"").slice(0,16),behId:b.id});}
   save();closeModal();refresh();toast(delta?"已记录，积分 "+(delta>0?"+":"")+delta:"已记录");
 };
 W.editBehavior=id=>{const b=el(id,S.behaviors);const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
   const cur=btype(b.type);
   const sel=types.some(t=>t.k===b.type)?b.type:types[0].k;
-  const tval=(b.time||nowLocal()).replace(" ","T");
+  const tval=fmtMin(b.time||nowLocal()).replace(" ","T");
   openModal(`<h3>修改行为</h3>
   <div class="field"><label class="lbl">学生</label><select class="fld" id="m_bs">${S.students.map(s=>`<option value="${s.id}" ${s.id===b.studentId?"selected":""}>${esc(s.name)}</option>`).join("")}</select></div>
   <div class="field" id="m_btimeWrap"></div>
@@ -3771,8 +3771,8 @@ W.editBehavior=id=>{const b=el(id,S.behaviors);const types=Array.isArray(S.behTy
   <div class="foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" onclick="W.doEditBehavior('${id}')">保存</button></div>`);
   W.behDD.open=false;/* 默认收起下拉 */
   W.renderBehTime();
-  const _bs=document.getElementById("m_btStart"); if(_bs&&(b.timeStart||b.time))_bs.value=(b.timeStart||b.time).replace(" ","T");
-  const _be=document.getElementById("m_btEnd"); if(_be&&b.timeEnd)_be.value=b.timeEnd.replace(" ","T");
+  const _bs=document.getElementById("m_btStart"); if(_bs&&(b.timeStart||b.time))_bs.value=fmtMin(b.timeStart||b.time).replace(" ","T");
+  const _be=document.getElementById("m_btEnd"); if(_be&&b.timeEnd)_be.value=fmtMin(b.timeEnd).replace(" ","T");
 };
 W.doEditBehavior=id=>{
   const b=el(id,S.behaviors);if(!b)return;
@@ -3786,12 +3786,12 @@ W.doEditBehavior=id=>{
   if(isLeaveType(type)){
     const s=$("#m_btStart")?$("#m_btStart").value:"";
     const e=$("#m_btEnd")?$("#m_btEnd").value:"";
-    b.timeStart=s?s.replace("T"," "):(b.timeStart||nowStr());
-    b.timeEnd=e?e.replace("T"," "):(b.timeEnd||b.timeStart);
+    b.timeStart=s?withSec(s.replace("T"," ")):(b.timeStart||nowStrS());
+    b.timeEnd=e?withSec(e.replace("T"," ")):(b.timeEnd||b.timeStart);
     b.time=b.timeStart;
   }else{
     const rawT=$("#m_btime")?$("#m_btime").value:"";
-    if(rawT)b.time=rawT.replace("T"," ");
+    if(rawT)b.time=withSec(rawT.replace("T"," "));
     delete b.timeStart; delete b.timeEnd;
   }
   if(type && !(Array.isArray(S.behTypes)?S.behTypes:[]).some(t=>t.k===type)){
@@ -6055,6 +6055,12 @@ function applyGradeText(ex,text){
 function nowStr(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());}
 /* 供 datetime-local 输入：YYYY-MM-DDTHH:MM */
 function nowLocal(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
+/* 秒级时间戳（YYYY-MM-DD HH:MM:SS）：行为记录存储用，保证同分钟内多条按录入秒序精确排序 */
+function nowStrS(){const d=new Date();const p=n=>n.toString().padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());}
+/* 给「分钟级」时间串（datetime-local 取值）补足当前秒，避免同分钟多条记录排序歧义 */
+function withSec(min){return (min||"").slice(0,16)+":"+String(new Date().getSeconds()).padStart(2,"0");}
+/* 时间显示截断到「分钟」（YYYY-MM-DD HH:MM），隐藏秒 */
+function fmtMin(t){return (t||"").slice(0,16);}
 
 /* ============ 云端同步（程序公开 / 数据私有） ============
    程序（本文件）放公开仓库，供 GitHub Pages 免费托管、手机 Safari 直接打开；
