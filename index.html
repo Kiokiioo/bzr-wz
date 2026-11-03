@@ -2337,20 +2337,39 @@ function viewBehavior(v){
   v.innerHTML=`
   <div class="card pad">
     <div class="row wrap" style="gap:8px;margin-bottom:12px">
-      <input class="fld h30" style="flex:1;min-width:0" placeholder="搜索学生 / 事由…" value="${esc(behKw)}" oninput="behKw=this.value;viewBehavior(document.getElementById('view'))">
+      <input class="fld h30" style="flex:1;min-width:0" placeholder="搜索学生 / 事由…" value="${esc(behKw)}" oninput="behKw=this.value;renderBehList()">
       ${behRangeSel}${behCustomBox}
       <button class="btn ghost sm h30" style="width:44px;flex:none" onclick="location.hash='#behtypes'">类别</button>
       <button class="btn sm h30" style="width:44px;flex:none" onclick="W.addBehavior()">记录</button>
     </div>
-    ${behStu?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eef3ff;color:var(--brand);border:1px solid var(--brand);border-radius:8px;padding:6px 10px;margin:-6px 0 10px;font-size:13px"><span>正在查看 <b>${esc(studentName(behStu))}</b> 的全部行为记录（${list.length} 条）</span><button class="btn sm h30" style="flex:none" onclick="behStu='';viewBehavior(document.getElementById('view'))">✕ 显示全部</button></div>`
-      :`<div class="tiny muted" style="margin:-6px 0 10px">时间范围：${esc(ptRangeLabel(bv))} · ${list.length} 条</div>`}
+    ${behStu?`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eef3ff;color:var(--brand);border:1px solid var(--brand);border-radius:8px;padding:6px 10px;margin:-6px 0 10px;font-size:13px"><span>正在查看 <b>${esc(studentName(behStu))}</b> 的全部行为记录（<span id="behCount"></span>）</span><button class="btn sm h30" style="flex:none" onclick="behStu='';viewBehavior(document.getElementById('view'))">✕ 显示全部</button></div>`
+      :`<div class="tiny muted" style="margin:-6px 0 10px">时间范围：${esc(ptRangeLabel(bv))} · <span id="behCount"></span></div>`}
     <div class="row wrap" style="margin-bottom:12px">${filters}</div>
-    ${list.length?list.map(b=>{
-      const tp=btype(b.type);
-      const d=b.delta||0;
-      const dBadge=d?`<span class="chip ${d>0?"ok":"bad"}" style="padding:1px 7px;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums">${d>0?"+"+d:d}分</span>`:"";
-      const col=typeColor(b.type),soft=typeSoft(b.type);
-      return `<div class="r-item"><span class="r-dot" style="background:${col};color:${col}"></span>
+    <div id="behList"></div>
+    <div class="tiny muted" style="margin-top:10px">记录时按类别默认分值自动加减总积分，删除记录会同步扣回。</div>
+  </div>`;
+  renderBehList();
+}
+
+/* 仅重渲行为记录结果列表（搜索框/工具栏保持不动，避免每次键入重建输入框导致中文 IME 组词被打断、光标丢失） */
+function renderBehList(){
+  const host=document.getElementById("behList");
+  if(!host) return;
+  const bv=S.behView||(S.behView={mode:"week",custom:{s:"",e:""}});
+  const _b=ptRangeBounds(bv);
+  let list=S.behaviors.slice().sort((a,b)=>(b.time||"").localeCompare(a.time||""));
+  if(behStu)list=list.filter(b=>b.studentId===behStu);
+  else if(_b)list=list.filter(b=>{const ds=(b.time||"").slice(0,10);return ds&&ds>=_b.s&&ds<=_b.e;});
+  if(behFilter)list=list.filter(b=>b.type===behFilter);
+  if(behKw){const k=behKw.toLowerCase();list=list.filter(b=>(studentName(b.studentId)+b.reason+b.type).toLowerCase().includes(k));}
+  const cnt=document.getElementById("behCount");
+  if(cnt)cnt.textContent=list.length+" 条";
+  host.innerHTML=list.length?list.map(b=>{
+    const tp=btype(b.type);
+    const d=b.delta||0;
+    const dBadge=d?`<span class="chip ${d>0?"ok":"bad"}" style="padding:1px 7px;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums">${d>0?"+"+d:d}分</span>`:"";
+    const col=typeColor(b.type),soft=typeSoft(b.type);
+    return `<div class="r-item"><span class="r-dot" style="background:${col};color:${col}"></span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b style="cursor:pointer;color:var(--brand)" title="查看该生全部行为记录" onclick="behStu='${b.studentId}';viewBehavior(document.getElementById('view'))">${esc(studentName(b.studentId))}</b>
@@ -2364,9 +2383,7 @@ function viewBehavior(v){
         <button onclick="W.editBehavior('${b.id}')">改</button>
         <button class="del" onclick="W.delBehavior('${b.id}')">删</button>
       </span></div>`;
-    }).join(""):`<div class="empty"><div class="big">📝</div>${S.behaviors.length?"该时间范围内还没有行为记录":"还没有行为记录"}</div>`}
-    <div class="tiny muted" style="margin-top:10px">记录时按类别默认分值自动加减总积分，删除记录会同步扣回。</div>
-  </div>`;
+  }).join(""):`<div class="empty"><div class="big">📝</div>${S.behaviors.length?"该时间范围内还没有行为记录":"还没有行为记录"}</div>`;
 }
 
 /* ============ SEATING ============ */
