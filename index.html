@@ -3678,6 +3678,7 @@ W.syncBehPts=k=>{$("#m_bp").innerHTML=W.behPtsSel(k);};
 /* 行为类型下拉（选择框 + 输入框）：下拉列出全部已设类别，可点选也可手输新类型。
    选类别即时同步该类别默认分值；输入不存在的类型时提供「用 XX 作为新类型」入口。 */
 W.behDD={open:false};
+let behLastType=null;/* 连续「记录」时记住上次选择的类型，第二次打开默认沿用 */
 W.renderBehDD=showAll=>{
   const dd=document.getElementById("m_btDD"); if(!dd)return;
   const inp=document.getElementById("m_bt"); if(!inp)return;
@@ -3712,23 +3713,32 @@ W.renderBehTime=()=>{
   const wrap=document.getElementById("m_btimeWrap"); if(!wrap)return;
   const inp=document.getElementById("m_bt");
   const leave=inp&&isLeaveType(inp.value);
+  const curSingle=document.getElementById("m_btime");
+  const curStart=document.getElementById("m_btStart");
+  const curEnd=document.getElementById("m_btEnd");
+  /* 结构未变（普通↔普通 / 请假↔请假）：完全不动 DOM，保留用户已选定的时间、光标与 IME 状态 */
+  const sameStruct=leave?(curStart&&curEnd):!!curSingle;
+  if(sameStruct) return;
+  /* 结构切换（普通↔请假）：把已选时间迁移到新控件，绝不回退成当前时间 */
+  const picked=(curSingle&&curSingle.value)||(curStart&&curStart.value)||nowLocal();
+  const pickedEnd=(curEnd&&curEnd.value)||picked;
   if(leave){
     wrap.innerHTML=`<label class="lbl">时间范围</label>
       <div class="row beh-time-row" style="gap:8px;align-items:stretch;width:100%">
-        <input class="fld" id="m_btStart" type="datetime-local" value="${nowLocal()}">
+        <input class="fld" id="m_btStart" type="datetime-local" value="${esc(picked)}">
         <span class="muted">至</span>
-        <input class="fld" id="m_btEnd" type="datetime-local" value="${nowLocal()}">
+        <input class="fld" id="m_btEnd" type="datetime-local" value="${esc(pickedEnd)}">
       </div>
       <div class="tiny muted" style="margin-top:4px">请填写请假的起始时间与结束时间</div>`;
   }else{
-    wrap.innerHTML=`<label class="lbl">时间</label><input class="fld" id="m_btime" type="datetime-local" value="${nowLocal()}">`;
+    wrap.innerHTML=`<label class="lbl">时间</label><input class="fld" id="m_btime" type="datetime-local" value="${esc(picked)}">`;
   }
   scheduleFitTemporal();setTimeout(fitTemporalWidths,120);  /* 异步注入的日期框，layout 稳定后再实测校正一次 */
 };
 
 W.addBehavior=(sid)=>{
   const types=Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES());
-  const firstK=types.some(t=>t.k==="表扬")?"表扬":types[0].k;
+  const firstK=(behLastType&&types.some(t=>t.k===behLastType))?behLastType:(types.some(t=>t.k==="表扬")?"表扬":types[0].k);
   openModal(`<h3>记录</h3>
     <div class="field"><label class="lbl">学生</label><select class="fld" id="m_bs">${S.students.map(s=>`<option value="${s.id}" ${sid&&s.id===sid?"selected":""}>${esc(s.name)}</option>`).join("")}</select></div>
     <div class="field" id="m_btimeWrap"></div>
@@ -3764,6 +3774,7 @@ W.doAddBehavior=()=>{
     (Array.isArray(S.behTypes)&&S.behTypes.length?S.behTypes:(S.behTypes=DEFAULT_BEH_TYPES())).push({k:type,c:delta<0?"bad":delta>0?"ok":"brand",pts:delta});
   }
   const b={id:uid(),studentId:sid,type,reason:$("#m_br").value.trim(),time,delta,timeStart,timeEnd};
+  behLastType=type||behLastType;/* 记住本次类型，供下次「记录」默认带出 */
   S.behaviors.push(b);
   if(delta){S.points.scores[sid]=(S.points.scores[sid]||0)+delta;
     S.points.logs.push({id:uid(),studentId:sid,delta,reason:"行为·"+type+(b.reason?"："+b.reason:""),time:(b.time||"").slice(0,16),behId:b.id});}
